@@ -7,8 +7,8 @@ Getting Started
 
 0) Assumptions
 
-a) You have SBT 10 installed. 
-b) Cassandra is running locally. 
+* You have SBT 10 installed. 
+* Cassandra is running locally. 
 
 1) Get Skeletor
 
