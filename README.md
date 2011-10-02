@@ -2,15 +2,13 @@ Skeletor
 ========
 
 Provides a Scala wrapper for Hector https://github.com/rantav/hector, a Java client library for Cassandra http://cassandra.apache.org/
-
 Getting Started
 ---------------
 
 0) Assumptions
 
-  a) You have SBT 10 installed. 
-
-  b) Cassandra is running locally. 
+a) You have SBT 10 installed. 
+b) Cassandra is running locally. 
 
 1) Get Skeletor
 
@@ -25,7 +23,6 @@ schema/bootstrap.txt contains the schema for Skeletor's Specification Tests
 
 3) Run Skeletor's test
 	
-	sbt update
 	sbt test
 
 How To Use
@@ -37,7 +34,7 @@ You can package Skeletor as a jar within your project
 
 	sbt package
 
-/*
-Joe Stein
+Thanx =) Joe Stein
+
 http://linkedin.com/in/charmalloc
-*/
+
