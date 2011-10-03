@@ -7,8 +7,8 @@ Getting Started
 
 0) Assumptions
 
-* You have SBT 10 installed. 
-* Cassandra is running locally. 
+* You have SBT 0.10 installed - https://github.com/harrah/xsbt/tree/0.10
+* Cassandra 0.8.6 is running locally - http://www.apache.org/dyn/closer.cgi?path=/cassandra/0.8.6/apache-cassandra-0.8.6-bin.tar.gz 
 
 1) Get Skeletor
 
