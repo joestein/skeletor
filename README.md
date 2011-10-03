@@ -7,7 +7,7 @@ Getting Started
 
 0) Assumptions
 
-* You have SBT 0.10 installed - https://github.com/harrah/xsbt/wiki/Setup
+* You have SBT installed - https://github.com/harrah/xsbt/wiki/Setup
 * Cassandra 0.8.6 is running locally - http://wiki.apache.org/cassandra/GettingStarted
 
 1) Get Skeletor
