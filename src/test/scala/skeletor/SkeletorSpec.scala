@@ -23,6 +23,27 @@ class SkeletorSpec extends Specification with Cassandra{
 	}
 	
 	"Skeletor " should  {
+		
+		"be able to add two rows together into the first" in {
+			val cv1 = (TestColumnFamily -> "rowKey1" has "columnName1" of "columnValue1")
+			
+			var rows1:Rows = Rows(cv1) //add the row to the rows object
+			
+			(rows1.rows.size == 1) must beTrue
+			
+			val cv2 = (TestColumnFamily -> "rowKey2" has "columnName2" of "columnValue2")
+			
+			var rows2:Rows = Rows(cv2) //add the row to the rows object			
+			
+			rows2.rows.size mustEqual 1
+			
+			rows1 ++ rows2  //add the second Rows into the first Rows, Rows1 becomes the new rows
+			
+			rows2.rows.size mustEqual 1 //make sure rows 2 is still 1
+			
+			rows1.rows.size mustEqual 2 //and rows1 is now equal to 2
+		}
+		
 		"write to Cassandra and read row key" in {
 			
 			val randRow = rnv()

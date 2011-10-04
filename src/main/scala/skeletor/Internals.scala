@@ -54,6 +54,12 @@ class Rows {
 	import scala.collection.mutable.ListBuffer
 	var rows:ListBuffer[ColumnNameValue] = new ListBuffer[ColumnNameValue]
 	def add(cv:ColumnNameValue) = rows.append(cv)
+	
+	//need to be able to handle adding the two list buffers together 
+	//without explicitly exposing the rows unecessarly
+	def ++(buffRows: Rows) = {
+		rows = rows ++ buffRows.rows
+	}	
 }
 
 object Rows {
