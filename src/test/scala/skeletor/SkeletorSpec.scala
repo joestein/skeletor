@@ -34,7 +34,7 @@ class SkeletorSpec extends Specification with Cassandra{
 
 			var rows:Rows = Rows(cv) //add the row to the rows object
 
-			debug("push the row=" + rowKey + " into Cassandra, batch mutate counter column=" + columnName + " and value=" + columnValue)
+			//println("push the row=" + rowKey + " into Cassandra, batch mutate counter column=" + columnName + " and value=" + columnValue)
 			Cassandra << rows 
 			
 			def processRow(r:String, c:String, v:String) = {
@@ -62,11 +62,11 @@ class SkeletorSpec extends Specification with Cassandra{
 			var cv = (col inc)
 			var rows:Rows = Rows(cv) //add the row to the rows object
 			
-			debug("push the row counter=" + rowKey + " into Cassandra, batch mutate counter column=" + columnName)
+			//println("push the row counter=" + rowKey + " into Cassandra, batch mutate counter column=" + columnName)
 			Cassandra << rows //push the row into Cassandra, batch mutate
 						
 			def processRow(r:String, c:String, v:Long) = {
-				debug("processRowCounter="+r+"["+c+"]="+v)
+				//println("processRowCounter="+r+"["+c+"]="+v)
 				(r == rowKey) must beTrue
 				(c == columnName) must beTrue
 				(v == 1) must beTrue
@@ -91,7 +91,7 @@ class SkeletorSpec extends Specification with Cassandra{
 			var cv = (col inc)
 			var rows:Rows = Rows(cv) //add the row to the rows object
 			
-			debug("push the row counter=" + rowKey + " into Cassandra, batch mutate counter column=" + columnName)
+			//println("push the row counter=" + rowKey + " into Cassandra, batch mutate counter column=" + columnName)
 			Cassandra << rows //push the row into Cassandra, batch mutate
 						
 			def setsGet(cq: CounterQuery[String, String]) {
@@ -100,7 +100,7 @@ class SkeletorSpec extends Specification with Cassandra{
 			}
 						
 			def processGetRow(v:Long) = {
-				debug("processRowCounter="+v)
+				//println("processRowCounter="+v)
 				(v == 1) must beTrue
 			}
 			
@@ -117,7 +117,7 @@ class SkeletorSpec extends Specification with Cassandra{
 			var cv = (col inc 6)
 			var rows:Rows = Rows(cv) //add the row to the rows object
 			
-			debug("push the row counter=" + rowKey + " into Cassandra, batch mutate counter column=" + columnName)
+			//println("push the row counter=" + rowKey + " into Cassandra, batch mutate counter column=" + columnName)
 			Cassandra << rows //push the row into Cassandra, batch mutate
 						
 			def setsGet(cq: CounterQuery[String, String]) {
@@ -126,7 +126,7 @@ class SkeletorSpec extends Specification with Cassandra{
 			}
 						
 			def processGetRow(v:Long) = {
-				debug("processRowCounter="+v)
+				//println("processRowCounter="+v)
 				(v == 6) must beTrue
 			}
 			
@@ -143,7 +143,7 @@ class SkeletorSpec extends Specification with Cassandra{
 			var cv = (col dec)
 			var rows:Rows = Rows(cv) //add the row to the rows object
 			
-			debug("push the row counter=" + rowKey + " into Cassandra, batch mutate counter column=" + columnName)
+			//println("push the row counter=" + rowKey + " into Cassandra, batch mutate counter column=" + columnName)
 			Cassandra << rows //push the row into Cassandra, batch mutate
 						
 			def setsGet(cq: CounterQuery[String, String]) {
@@ -152,7 +152,7 @@ class SkeletorSpec extends Specification with Cassandra{
 			}
 						
 			def processGetRow(v:Long) = {
-				debug("processRowCounter="+v)
+				//println("processRowCounter="+v)
 				(v == -1) must beTrue
 			}
 			
@@ -169,7 +169,7 @@ class SkeletorSpec extends Specification with Cassandra{
 			var cv = (col dec 7)
 			var rows:Rows = Rows(cv) //add the row to the rows object
 			
-			debug("push the row counter=" + rowKey + " into Cassandra, batch mutate counter column=" + columnName)
+			//println("push the row counter=" + rowKey + " into Cassandra, batch mutate counter column=" + columnName)
 			Cassandra << rows //push the row into Cassandra, batch mutate
 						
 			def setsGet(cq: CounterQuery[String, String]) {
@@ -178,7 +178,7 @@ class SkeletorSpec extends Specification with Cassandra{
 			}
 						
 			def processGetRow(v:Long) = {
-				debug("processRowCounter="+v)
+				//println("processRowCounter="+v)
 				(v == -7) must beTrue
 			}
 			

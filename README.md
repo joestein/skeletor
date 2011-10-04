@@ -34,6 +34,12 @@ You can package Skeletor as a jar within your project
 
 	sbt package
 
+And in your 
+`build.sbt` file add to 
+`libraryDependencies ++= Seq` so you get the Hector library
+
+	"me.prettyprint" % "hector-core" % "0.8.0-2"
+
 Thanx =) Joe Stein
 
 http://linkedin.com/in/charmalloc
