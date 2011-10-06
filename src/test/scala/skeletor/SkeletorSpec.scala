@@ -204,6 +204,43 @@ class SkeletorSpec extends Specification with Cassandra{
 			}
 			
 			CounterTestColumnFamily >% (setsGet, processGetRow)  //get data out of Cassandra and process it		
-		}				
+		}			
+		
+		// more info on consitency settings = http://www.datastax.com/docs/0.8/dml/data_consistency
+		"be able to tune consistency" in {
+			
+			import me.prettyprint.hector.api.{ConsistencyLevelPolicy}
+			import github.joestein.skeletor.{CL}
+			
+			"new default for all reads and another for writes" in {
+				
+				//new default read consistency
+				var defaultReadConsistencyLevel: ConsistencyLevelPolicy = {
+					CL.ANY()
+				}	
+				
+				Cassandra.defaultReadConsistencyLevel = defaultReadConsistencyLevel
+				
+				//new default write consistency
+				var defaultWriteConsistencyLevel: ConsistencyLevelPolicy = {
+					CL.QUARUM()
+				}							
+				
+				Cassandra.defaultWriteConsistencyLevel = defaultWriteConsistencyLevel
+				
+				true must beTrue //TODO: some better test than just everything getting to this point without exception
+			}
+			
+			"read and write explicitly with ALL consistency"  in {
+				var cv = (TestColumnFamily -> "rowKey" has "columnName" of "columnValue")
+				var rows:Rows = Rows(cv) //add the row to the rows object
+
+				//println("push the row=" + rowKey + " into Cassandra, batch mutate counter column=" + columnName + " and value=" + columnValue)
+				Cassandra << (rows, CL.ALL())
+				
+				true must beTrue //TODO: some better test than just everything getting to this point without exception
+			}
+			
+		}
 	} 
 }

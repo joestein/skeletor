@@ -18,17 +18,27 @@ object Cassandra extends LogHelper {
 	def connect(name: String, servers: String) = {
 		*(name,servers)
 	}
-	
+		
 	import scala.collection.mutable.ListBuffer
 	import me.prettyprint.cassandra.serializers.LongSerializer
 	import me.prettyprint.cassandra.serializers.StringSerializer
-	import me.prettyprint.cassandra.model.AllOneConsistencyLevelPolicy;
+	import me.prettyprint.hector.api.ConsistencyLevelPolicy
 	
-	def ++ (rows:ListBuffer[ColumnNameValue], keyspaceSettings: (HKeyspace) => Unit ): Unit = {
+	
+	//default write consistency
+	var defaultWriteConsistencyLevel: ConsistencyLevelPolicy = {
+		CL.ONE()
+	}
+	
+	//default read consistency
+	var defaultReadConsistencyLevel: ConsistencyLevelPolicy = {
+		CL.ONE()
+	}
+		
+	def ++ (rows:ListBuffer[ColumnNameValue], cl: ConsistencyLevelPolicy = defaultWriteConsistencyLevel): Unit = {
 		var stringSerializer = StringSerializer.get()
 		val ksp = HFactory.createKeyspace(rows(0).ks, cluster);
-		
-		keyspaceSettings(ksp) //this way you can set your own consistency level
+		ksp.setConsistencyLevelPolicy(cl) //this way you can set your own consistency level
 		
 		var mutator = HFactory.createMutator(ksp, stringSerializer);
 
@@ -38,28 +48,19 @@ object Cassandra extends LogHelper {
 		
 		mutator.execute()
 	}
-	
-	def defaultKeyspaceSettings(ksp: HKeyspace) = {
-		var cp = new AllOneConsistencyLevelPolicy();
-		ksp.setConsistencyLevelPolicy(cp)		
-	}
 		
-	def ++ (rows:ListBuffer[ColumnNameValue]): Unit = {
-		
-		++ (rows,defaultKeyspaceSettings) //use a default consistency of one
-	}
 	
-	def << (rows:ListBuffer[ColumnNameValue], keyspaceSettings: (HKeyspace) => Unit ): Unit = {
+	def << (rows:ListBuffer[ColumnNameValue], cl: ConsistencyLevelPolicy = defaultWriteConsistencyLevel): Unit = {
 	
 		if (rows(0).isCounter) {  //it is a counter column to shoot it on up
-			++(rows,keyspaceSettings)  //this way you can set your own consistency level
+			++(rows,cl)  //this way you can set your own consistency level
 		}
 		else {
 			var stringSerializer = StringSerializer.get()
 			val ksp = HFactory.createKeyspace(rows(0).ks, cluster);
+			ksp.setConsistencyLevelPolicy(cl) //this way you can set your own consistency level
+			
 			var mutator = HFactory.createMutator(ksp, stringSerializer);
-
-			keyspaceSettings(ksp)  //this way you can set your own consistency level
 
 			rows.foreach { cv =>        
 				mutator.addInsertion(cv.row, cv.cf, HFactory.createStringColumn(cv.name, cv.value))
@@ -68,24 +69,16 @@ object Cassandra extends LogHelper {
 			mutator.execute()
 		}	
 	}
-	// mutation
-	def << (rows:ListBuffer[ColumnNameValue]): Unit = {
-		if (rows(0).isCounter) {//it is a counter column to shoot it on up
-			++(rows,defaultKeyspaceSettings)  //use a default consistency of one
-		}		
-		else {
-			<< (rows,defaultKeyspaceSettings)  //use a default consistency of one
-		}
-	}	
 	
-	def >> (cf: ColumnFamily, sets: (MultigetSliceQuery[String,String,String]) => Unit,  proc: (String, String, String) => Unit) = {
+	def >> (cf: ColumnFamily, settings: (MultigetSliceQuery[String,String,String]) => Unit,  proc: (String, String, String) => Unit, cl: ConsistencyLevelPolicy = defaultWriteConsistencyLevel) = {
 		var stringSerializer = StringSerializer.get()
 		val ksp = HFactory.createKeyspace(cf.ks, cluster);
-				
+		ksp.setConsistencyLevelPolicy(cl) //this way you can set your own consistency level
+		
 		var multigetSliceQuery = HFactory.createMultigetSliceQuery(ksp, stringSerializer, stringSerializer, stringSerializer)
 		multigetSliceQuery.setColumnFamily(cf);            
 
-		sets(multigetSliceQuery); //let the caller define keys, range, count whatever they want on this CF
+		settings(multigetSliceQuery); //let the caller define keys, range, count whatever they want on this CF
 
 		var result = multigetSliceQuery.execute();
 		var orderedRows = result.get();		
@@ -102,10 +95,11 @@ object Cassandra extends LogHelper {
 		}		
 	}
 	
-	def ># (cf: ColumnFamily, sets: (MultigetSliceCounterQuery[String,String]) => Unit,  proc: (String, String, Long) => Unit) = {
+	def ># (cf: ColumnFamily, sets: (MultigetSliceCounterQuery[String,String]) => Unit,  proc: (String, String, Long) => Unit, cl: ConsistencyLevelPolicy = defaultWriteConsistencyLevel) = {
 		var stringSerializer = StringSerializer.get()
 		val ksp = HFactory.createKeyspace(cf.ks, cluster);
-				
+		ksp.setConsistencyLevelPolicy(cl) //this way you can set your own consistency level
+		
 		var multigetCounterSliceQuery = HFactory.createMultigetSliceCounterQuery(ksp, stringSerializer, stringSerializer)
 		multigetCounterSliceQuery.setColumnFamily(cf);            
 
@@ -128,10 +122,11 @@ object Cassandra extends LogHelper {
 		}
 	}	
 	
-	def >% (cf: ColumnFamily, sets: (CounterQuery[String,String]) => Unit,  proc: (Long) => Unit) = {
+	def >% (cf: ColumnFamily, sets: (CounterQuery[String,String]) => Unit,  proc: (Long) => Unit, cl: ConsistencyLevelPolicy = defaultWriteConsistencyLevel) = {
 		var stringSerializer = StringSerializer.get()
 		val ksp = HFactory.createKeyspace(cf.ks, cluster);
-				
+		ksp.setConsistencyLevelPolicy(cl) //this way you can set your own consistency level
+		
 		var getCounterQuery = HFactory.createCounterColumnQuery(ksp, stringSerializer, stringSerializer)
 		getCounterQuery.setColumnFamily(cf)
 
