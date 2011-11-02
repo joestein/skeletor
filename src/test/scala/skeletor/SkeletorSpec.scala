@@ -240,7 +240,43 @@ class SkeletorSpec extends Specification with Cassandra{
 				
 				true must beTrue //TODO: some better test than just everything getting to this point without exception
 			}
-			
+		
+			"delete an entire row" in {
+				val randRow = rnv()
+				val rowKey = randRow._1 //lets take some random unique string to write and verify reading it
+				val columnName = randRow._2 //lets take some random unique string to write and verify reading it
+				val columnValue = randRow._3 //lets take some random unique string to write and verify reading it
+
+				var cv = (TestColumnFamily -> rowKey has columnName of columnValue) //create a column value for a row for this column family
+
+				var rows:Rows = Rows(cv) //add the row to the rows object
+
+				//println("push the row=" + rowKey + " into Cassandra, batch mutate counter column=" + columnName + " and value=" + columnValue)
+				Cassandra << rows 
+
+				def processRow(r:String, c:String, v:String) = {
+					(r == rowKey) must beTrue
+					(c == columnName) must beTrue
+					(v == columnValue) must beTrue
+				}
+
+				def sets(mgsq: MultigetSliceQuery[String, String, String]) {
+					mgsq.setKeys(rowKey) //we want to pull out the row key we just put into Cassandra
+					mgsq.setColumnNames(columnName) //and just this column
+				}
+
+				TestColumnFamily >> (sets, processRow) //get data out of Cassandra and process it			
+				
+				def deletedRow(r:String, c:String, v:String) = {
+					(r != rowKey) must beTrue
+					(c != columnName) must beTrue
+					(v != columnValue) must beTrue
+				}
+				
+				Cassandra delete rows.rows(0)
+				
+				TestColumnFamily >> (sets, deletedRow) //get data out of Cassandra and process it							
+			}			
 		}
 	} 
 }

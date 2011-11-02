@@ -19,6 +19,10 @@ object Cassandra extends LogHelper {
 		*(name,servers)
 	}
 		
+	def shutdown() = {
+		cluster.getConnectionManager().shutdown()
+		
+	}
 	import scala.collection.mutable.ListBuffer
 	import me.prettyprint.cassandra.serializers.LongSerializer
 	import me.prettyprint.cassandra.serializers.StringSerializer
@@ -93,6 +97,20 @@ object Cassandra extends LogHelper {
 				proc(o.getKey(),l.getName(),l.getValue())
 			}
 		}		
+	}
+	
+	//delete a row
+	def delete (cnv: ColumnNameValue, cl: ConsistencyLevelPolicy = defaultWriteConsistencyLevel) = {
+		var stringSerializer = StringSerializer.get()
+		val ksp = HFactory.createKeyspace(cnv.ks, cluster);
+		ksp.setConsistencyLevelPolicy(cl) //this way you can set your own consistency level
+		
+		var mutator = HFactory.createMutator(ksp, stringSerializer);
+		
+		if (cnv.name == "") 
+			mutator.delete(cnv.row,cnv.cf,null,stringSerializer); //setting null for column gets rid of entire row
+		else 
+			mutator.delete(cnv.row,cnv.cf,cnv.name,stringSerializer); //setting null for column gets rid of entire row
 	}
 	
 	def ># (cf: ColumnFamily, sets: (MultigetSliceCounterQuery[String,String]) => Unit,  proc: (String, String, Long) => Unit, cl: ConsistencyLevelPolicy = defaultWriteConsistencyLevel) = {
