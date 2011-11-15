@@ -1,3 +1,7 @@
 project/
 target/
 .lib/
+.cache
+.classpath
+.project
+.target/
