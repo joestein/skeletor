@@ -2,7 +2,7 @@ organization := "github.joestein"
 
 name := "skeletor"
 
-version := "1.0.0.0"
+version := "1.0.0.2"
 
 scalaVersion := "2.9.0-1"
 
@@ -11,3 +11,6 @@ libraryDependencies ++= Seq(
 	"me.prettyprint" % "hector-core" % "0.8.0-2"
 )
 
+publishTo := Some("Nexus" at "http://nexus:8082/nexus/content/repositories/releases/")
+
+credentials += Credentials(Path.userHome / ".ivy2" / ".credentials") 
