@@ -4,9 +4,9 @@ organization := "github.joestein"
 
 name := "skeletor"
 
-version := "1.0.0.3"
+version := "1.0.0.4-SNAPSHOT"
 
-scalaVersion := "2.9.0-1"
+scalaVersion := "2.9.1"
 
 libraryDependencies ++= Seq(
 	"org.scala-tools.testing" % "specs_2.8.1" % "1.6.6" % "test",
