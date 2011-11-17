@@ -65,12 +65,16 @@ class Rows(cv: Option[ColumnNameValue] = None) {
 
     cv.foreach(rows += _)
 
-    def add(cv: ColumnNameValue) = rows += cv
+    def add(cv: ColumnNameValue) = {
+      rows += cv
+      this
+    } 
 
     //need to be able to handle adding the two list buffers together 
     //without explicitly exposing the rows unecessarly
     def ++(buffRows: Rows) = {
         rows ++= buffRows.rows
+        this
     }
 
     def get = {
@@ -108,6 +112,10 @@ case class ColumnFamily(val ks: Keyspace, val name: String) extends LogHelper {
         Cassandra >% (this, sets, proc)
     }
 
+    def << (rows:Seq[ColumnNameValue]) = {
+        Cassandra << rows
+    }
+    
     /*
      *  create the column family
      */
