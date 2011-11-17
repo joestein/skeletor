@@ -1,167 +1,192 @@
 package github.joestein.skeletor
 
-import me.prettyprint.hector.api.{Cluster, Keyspace=>HKeyspace};
+import me.prettyprint.hector.api.{ Cluster, Keyspace => HKeyspace }
 import me.prettyprint.hector.api.factory.HFactory
-import me.prettyprint.hector.api.query.{MultigetSliceQuery,MultigetSliceCounterQuery,CounterQuery}
-import github.joestein.util.{LogHelper}
+import me.prettyprint.hector.api.query.{ MultigetSliceQuery, MultigetSliceCounterQuery, CounterQuery }
+import github.joestein.util.{ LogHelper }
 import Conversions._
+import me.prettyprint.hector.api.query.Query
+import me.prettyprint.hector.api.beans.{ Rows => HectorRows }
+import me.prettyprint.cassandra.model.IndexedSlicesQuery
 
 object Cassandra extends LogHelper {
-	//https://github.com/rantav/hector/blob/master/core/src/main/java/me/prettyprint/hector/api/factory/HFactory.java
-	
-	var cluster:Cluster = null
-	
-	def *(name: String, servers: String) = {
-		cluster = HFactory.getOrCreateCluster(name,servers);
-	}
-	
-	def connect(name: String, servers: String) = {
-		*(name,servers)
-	}
-		
-	def shutdown() = {
-		cluster.getConnectionManager().shutdown()
-		
-	}
-	import scala.collection.mutable.ListBuffer
-	import me.prettyprint.cassandra.serializers.LongSerializer
-	import me.prettyprint.cassandra.serializers.StringSerializer
-	import me.prettyprint.hector.api.ConsistencyLevelPolicy
-	
-	
-	//default write consistency
-	var defaultWriteConsistencyLevel: ConsistencyLevelPolicy = {
-		CL.ONE()
-	}
-	
-	//default read consistency
-	var defaultReadConsistencyLevel: ConsistencyLevelPolicy = {
-		CL.ONE()
-	}
-		
-	def ++ (rows:Seq[ColumnNameValue], cl: ConsistencyLevelPolicy = defaultWriteConsistencyLevel): Unit = {
-		var stringSerializer = StringSerializer.get()
-		val ksp = HFactory.createKeyspace(rows(0).ks, cluster);
-		ksp.setConsistencyLevelPolicy(cl) //this way you can set your own consistency level
-		
-		var mutator = HFactory.createMutator(ksp, stringSerializer);
+    //https://github.com/rantav/hector/blob/master/core/src/main/java/me/prettyprint/hector/api/factory/HFactory.java
 
-		rows.foreach { cv =>        
-			mutator.insertCounter(cv.row, cv.cf, HFactory.createCounterColumn(cv.name, cv.value.toInt))
-		}
-		
-		mutator.execute()
-	}
-		
-	
-	def << (rows:Seq[ColumnNameValue], cl: ConsistencyLevelPolicy = defaultWriteConsistencyLevel): Unit = {
-	
-		if (rows(0).isCounter) {  //it is a counter column to shoot it on up
-			++(rows,cl)  //this way you can set your own consistency level
-		}
-		else {
-			var stringSerializer = StringSerializer.get()
-			val ksp = HFactory.createKeyspace(rows(0).ks, cluster);
-			ksp.setConsistencyLevelPolicy(cl) //this way you can set your own consistency level
-			
-			var mutator = HFactory.createMutator(ksp, stringSerializer);
+    var cluster: Cluster = null
 
-			rows.foreach { cv =>        
-				mutator.addInsertion(cv.row, cv.cf, HFactory.createStringColumn(cv.name, cv.value))
-			}
+    def *(name: String, servers: String) = {
+        cluster = HFactory.getOrCreateCluster(name, servers);
+    }
 
-			mutator.execute()
-		}	
-	}
-	
-	def >> (cf: ColumnFamily, settings: (MultigetSliceQuery[String,String,String]) => Unit,  proc: (String, String, String) => Unit, cl: ConsistencyLevelPolicy = defaultWriteConsistencyLevel) = {
-		var stringSerializer = StringSerializer.get()
-		val ksp = HFactory.createKeyspace(cf.ks, cluster);
-		ksp.setConsistencyLevelPolicy(cl) //this way you can set your own consistency level
-		
-		var multigetSliceQuery = HFactory.createMultigetSliceQuery(ksp, stringSerializer, stringSerializer, stringSerializer)
-		multigetSliceQuery.setColumnFamily(cf);            
+    def connect(name: String, servers: String) = {
+        *(name, servers)
+    }
 
-		settings(multigetSliceQuery); //let the caller define keys, range, count whatever they want on this CF
+    def shutdown() = {
+        cluster.getConnectionManager().shutdown()
 
-		var result = multigetSliceQuery.execute();
-		var orderedRows = result.get();		
-		import scala.collection.JavaConversions._
-		for (o <- orderedRows) {
+    }
+    import scala.collection.mutable.ListBuffer
+    import me.prettyprint.cassandra.serializers.LongSerializer
+    import me.prettyprint.cassandra.serializers.StringSerializer
+    import me.prettyprint.hector.api.ConsistencyLevelPolicy
 
-			val c = o.getColumnSlice()
-			val d = c.getColumns()
+    //default write consistency
+    var defaultWriteConsistencyLevel: ConsistencyLevelPolicy = {
+        CL.ONE()
+    }
 
-			for (l <- d) {
-				debug("keyMultigetSliceQuery=" + o.getKey() + " for column=" + l.getName() + " & value=" + l.getValue())
-				proc(o.getKey(),l.getName(),l.getValue())
-			}
-		}		
-	}
-	
-	//delete a row
-	def delete (cnv: ColumnNameValue, cl: ConsistencyLevelPolicy = defaultWriteConsistencyLevel) = {
-		var stringSerializer = StringSerializer.get()
-		val ksp = HFactory.createKeyspace(cnv.ks, cluster);
-		ksp.setConsistencyLevelPolicy(cl) //this way you can set your own consistency level
-		
-		var mutator = HFactory.createMutator(ksp, stringSerializer);
-		
-		if (cnv.name == "") 
-			mutator.delete(cnv.row,cnv.cf,null,stringSerializer); //setting null for column gets rid of entire row
-		else 
-			mutator.delete(cnv.row,cnv.cf,cnv.name,stringSerializer); //setting null for column gets rid of entire row
-	}
-	
-	def ># (cf: ColumnFamily, sets: (MultigetSliceCounterQuery[String,String]) => Unit,  proc: (String, String, Long) => Unit, cl: ConsistencyLevelPolicy = defaultWriteConsistencyLevel) = {
-		var stringSerializer = StringSerializer.get()
-		val ksp = HFactory.createKeyspace(cf.ks, cluster);
-		ksp.setConsistencyLevelPolicy(cl) //this way you can set your own consistency level
-		
-		var multigetCounterSliceQuery = HFactory.createMultigetSliceCounterQuery(ksp, stringSerializer, stringSerializer)
-		multigetCounterSliceQuery.setColumnFamily(cf);            
+    //default read consistency
+    var defaultReadConsistencyLevel: ConsistencyLevelPolicy = {
+        CL.ONE()
+    }
 
-		sets(multigetCounterSliceQuery); //let the caller define keys, range, count whatever they want on this CF
+    def ++(rows: Seq[ColumnNameValue], cl: ConsistencyLevelPolicy = defaultWriteConsistencyLevel): Unit = {
+        var stringSerializer = StringSerializer.get()
+        val ksp = HFactory.createKeyspace(rows(0).ks, cluster);
+        ksp.setConsistencyLevelPolicy(cl) //this way you can set your own consistency level
 
-		var result = multigetCounterSliceQuery.execute();
-		var orderedRows = result.get();		
-		debug("keyMultigetSliceCounterQuery order rows called")
-		import scala.collection.JavaConversions._
-		
-		for (o <- orderedRows) {
+        var mutator = HFactory.createMutator(ksp, stringSerializer);
 
-			val c = o.getColumnSlice()
-			val d = c.getColumns()
+        rows.foreach { cv =>
+            mutator.insertCounter(cv.row, cv.cf, HFactory.createCounterColumn(cv.name, cv.value.toInt))
+        }
 
-			for (l <- d) {
-				debug("keyMultigetSliceCounterQuery=" + o.getKey() + " for column=" + l.getName() + " & value=" + l.getValue())
-				proc(o.getKey(),l.getName(),l.getValue())
-			}
-		}
-	}	
-	
-	def >% (cf: ColumnFamily, sets: (CounterQuery[String,String]) => Unit,  proc: (Long) => Unit, cl: ConsistencyLevelPolicy = defaultWriteConsistencyLevel) = {
-		var stringSerializer = StringSerializer.get()
-		val ksp = HFactory.createKeyspace(cf.ks, cluster);
-		ksp.setConsistencyLevelPolicy(cl) //this way you can set your own consistency level
-		
-		var getCounterQuery = HFactory.createCounterColumnQuery(ksp, stringSerializer, stringSerializer)
-		getCounterQuery.setColumnFamily(cf)
+        mutator.execute()
+    }
 
-		sets(getCounterQuery); //let the caller define keys, range, count whatever they want on this CF
+    def <<(rows: Seq[ColumnNameValue], cl: ConsistencyLevelPolicy = defaultWriteConsistencyLevel): Unit = {
 
-		var result = getCounterQuery.execute();
-		var counter = result.get();		
+        if (rows(0).isCounter) { //it is a counter column to shoot it on up
+            ++(rows, cl) //this way you can set your own consistency level
+        } else {
+            var stringSerializer = StringSerializer.get()
+            val ksp = HFactory.createKeyspace(rows(0).ks, cluster);
+            ksp.setConsistencyLevelPolicy(cl) //this way you can set your own consistency level
 
-		if (counter != null)
-			proc(counter.getValue())
-	}	
+            var mutator = HFactory.createMutator(ksp, stringSerializer);
+
+            rows.foreach { cv =>
+                mutator.addInsertion(cv.row, cv.cf, HFactory.createStringColumn(cv.name, cv.value))
+            }
+
+            mutator.execute()
+        }
+    }
+
+    def indexQuery(cf: ColumnFamily, settings: (IndexedSlicesQuery[String, String, String]) => Unit, proc: (String, String, String) => Unit, cl: ConsistencyLevelPolicy = defaultWriteConsistencyLevel) = {
+        var stringSerializer = StringSerializer.get()
+        val ksp = HFactory.createKeyspace(cf.ks, cluster);
+        ksp.setConsistencyLevelPolicy(cl) //this way you can set your own consistency level
+
+        var query = HFactory.createIndexedSlicesQuery(ksp, stringSerializer, stringSerializer, stringSerializer)
+        query.setColumnFamily(cf);
+
+        settings(query); //let the caller define keys, range, count whatever they want on this CF
+
+        executeQuery(query, proc)
+    }
+
+    def rangeQuery(cf: ColumnFamily, settings: (MultigetSliceQuery[String, String, String]) => Unit, proc: (String, String, String) => Unit, cl: ConsistencyLevelPolicy = defaultWriteConsistencyLevel) = {
+        var stringSerializer = StringSerializer.get()
+        val ksp = HFactory.createKeyspace(cf.ks, cluster);
+        ksp.setConsistencyLevelPolicy(cl) //this way you can set your own consistency level
+
+        var multigetSliceQuery = HFactory.createMultigetSliceQuery(ksp, stringSerializer, stringSerializer, stringSerializer)
+        multigetSliceQuery.setColumnFamily(cf);
+
+        settings(multigetSliceQuery); //let the caller define keys, range, count whatever they want on this CF
+
+        executeQuery(multigetSliceQuery, proc)
+    }
+
+    def >>(cf: ColumnFamily, settings: (MultigetSliceQuery[String, String, String]) => Unit, proc: (String, String, String) => Unit, cl: ConsistencyLevelPolicy = defaultWriteConsistencyLevel) = {
+        rangeQuery(cf, settings, proc, cl)
+    }
+
+    private def executeQuery(query: Query[_ <: HectorRows[String, String, String]], proc: (String, String, String) => Unit) = {
+        var result = query.execute();
+        var orderedRows = result.get();
+        import scala.collection.JavaConversions._
+        for (o <- orderedRows) {
+
+            val c = o.getColumnSlice()
+            val d = c.getColumns()
+
+            if (d.isEmpty()) {
+                proc(o.getKey, null, null)
+            } else {
+                for (l <- d) {
+                    debug("query=" + o.getKey() + " for column=" + l.getName() + " & value=" + l.getValue())
+                    proc(o.getKey(), l.getName(), l.getValue())
+                }
+            }
+        }
+    }
+
+    //delete a row
+    def delete(cnv: ColumnNameValue, cl: ConsistencyLevelPolicy = defaultWriteConsistencyLevel) = {
+        var stringSerializer = StringSerializer.get()
+        val ksp = HFactory.createKeyspace(cnv.ks, cluster);
+        ksp.setConsistencyLevelPolicy(cl) //this way you can set your own consistency level
+
+        var mutator = HFactory.createMutator(ksp, stringSerializer);
+
+        if (cnv.name == "")
+            mutator.delete(cnv.row, cnv.cf, null, stringSerializer); //setting null for column gets rid of entire row
+        else
+            mutator.delete(cnv.row, cnv.cf, cnv.name, stringSerializer); //setting null for column gets rid of entire row
+    }
+
+    def >#(cf: ColumnFamily, sets: (MultigetSliceCounterQuery[String, String]) => Unit, proc: (String, String, Long) => Unit, cl: ConsistencyLevelPolicy = defaultWriteConsistencyLevel) = {
+        var stringSerializer = StringSerializer.get()
+        val ksp = HFactory.createKeyspace(cf.ks, cluster);
+        ksp.setConsistencyLevelPolicy(cl) //this way you can set your own consistency level
+
+        var multigetCounterSliceQuery = HFactory.createMultigetSliceCounterQuery(ksp, stringSerializer, stringSerializer)
+        multigetCounterSliceQuery.setColumnFamily(cf);
+
+        sets(multigetCounterSliceQuery); //let the caller define keys, range, count whatever they want on this CF
+
+        var result = multigetCounterSliceQuery.execute();
+        var orderedRows = result.get();
+        debug("keyMultigetSliceCounterQuery order rows called")
+        import scala.collection.JavaConversions._
+
+        for (o <- orderedRows) {
+
+            val c = o.getColumnSlice()
+            val d = c.getColumns()
+
+            for (l <- d) {
+                debug("keyMultigetSliceCounterQuery=" + o.getKey() + " for column=" + l.getName() + " & value=" + l.getValue())
+                proc(o.getKey(), l.getName(), l.getValue())
+            }
+        }
+    }
+
+    def >%(cf: ColumnFamily, sets: (CounterQuery[String, String]) => Unit, proc: (Long) => Unit, cl: ConsistencyLevelPolicy = defaultWriteConsistencyLevel) = {
+        var stringSerializer = StringSerializer.get()
+        val ksp = HFactory.createKeyspace(cf.ks, cluster);
+        ksp.setConsistencyLevelPolicy(cl) //this way you can set your own consistency level
+
+        var getCounterQuery = HFactory.createCounterColumnQuery(ksp, stringSerializer, stringSerializer)
+        getCounterQuery.setColumnFamily(cf)
+
+        sets(getCounterQuery); //let the caller define keys, range, count whatever they want on this CF
+
+        var result = getCounterQuery.execute();
+        var counter = result.get();
+
+        if (counter != null)
+            proc(counter.getValue())
+    }
 }
 
 trait Cassandra {
-	//https://github.com/rantav/hector/blob/master/core/src/main/java/me/prettyprint/cassandra/service/CassandraHostConfigurator.java
-	
-	def ^ = {
-		Cassandra.cluster
-	}
+    //https://github.com/rantav/hector/blob/master/core/src/main/java/me/prettyprint/cassandra/service/CassandraHostConfigurator.java
+
+    def ^ = {
+        Cassandra.cluster
+    }
 }
