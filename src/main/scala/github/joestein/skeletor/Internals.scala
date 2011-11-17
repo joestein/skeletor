@@ -108,12 +108,25 @@ case class ColumnFamily(val ks: Keyspace, val name: String) extends LogHelper {
         Cassandra >% (this, sets, proc)
     }
 
+    /*
+     *  create the column family
+     */
     def create = {
         Cassandra.cluster.addColumnFamily(columnFamilyDefinition, true)
     }
 
+    /*
+     * drop the column family from the keyspace
+     */
     def delete = {
         Cassandra.cluster.dropColumnFamily(ks, name, true)
+    }
+
+    /*
+     * truncate the data from this column family
+     */
+    def truncate = {
+        Cassandra.cluster.truncate(ks, name)
     }
 }
 
