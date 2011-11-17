@@ -39,7 +39,7 @@ object Cassandra extends LogHelper {
 		CL.ONE()
 	}
 		
-	def ++ (rows:ListBuffer[ColumnNameValue], cl: ConsistencyLevelPolicy = defaultWriteConsistencyLevel): Unit = {
+	def ++ (rows:Seq[ColumnNameValue], cl: ConsistencyLevelPolicy = defaultWriteConsistencyLevel): Unit = {
 		var stringSerializer = StringSerializer.get()
 		val ksp = HFactory.createKeyspace(rows(0).ks, cluster);
 		ksp.setConsistencyLevelPolicy(cl) //this way you can set your own consistency level
@@ -54,7 +54,7 @@ object Cassandra extends LogHelper {
 	}
 		
 	
-	def << (rows:ListBuffer[ColumnNameValue], cl: ConsistencyLevelPolicy = defaultWriteConsistencyLevel): Unit = {
+	def << (rows:Seq[ColumnNameValue], cl: ConsistencyLevelPolicy = defaultWriteConsistencyLevel): Unit = {
 	
 		if (rows(0).isCounter) {  //it is a counter column to shoot it on up
 			++(rows,cl)  //this way you can set your own consistency level

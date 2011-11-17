@@ -1,19 +1,24 @@
 package github.joestein.skeletor
 
-import scala.collection.JavaConversions._
-import github.joestein.util.{ LogHelper }
-import me.prettyprint.hector.api.query.{ MultigetSliceQuery, MultigetSliceCounterQuery, CounterQuery }
-import me.prettyprint.hector.api.ddl.{ ComparatorType }
-import me.prettyprint.hector.api.factory.HFactory
+import java.util.Collections
+
+import scala.collection.mutable.ListBuffer
+
 import org.apache.cassandra.locator.SimpleStrategy
-import me.prettyprint.hector.api.ddl.ColumnFamilyDefinition
+
+import github.joestein.skeletor.Conversions.keyspaceString
+import github.joestein.util.LogHelper
+import me.prettyprint.hector.api.ddl.ComparatorType
+import me.prettyprint.hector.api.factory.HFactory
+import me.prettyprint.hector.api.query.MultigetSliceQuery
+import me.prettyprint.hector.api.query.{ MultigetSliceCounterQuery, CounterQuery }
 
 object Conversions {
     implicit def simplekey(s: String): Keyspace = Keyspace(s)
     implicit def keyspaceString(ks: Keyspace): String = ks.name
     implicit def rowString(r: Row): String = r.name
     implicit def columnfamily(cf: ColumnFamily) = cf.name
-    implicit def getrows(r: Rows) = r.rows
+    implicit def getrows(r: Rows) = r.get
 }
 
 case class ColumnNameValue(column: Column, name: String, value: String, isCounter: Boolean) {
@@ -54,38 +59,37 @@ object Row {
     def apply(cv: ColumnNameValue): Row = cv.row
 }
 
-class Rows {
+class Rows(cv: Option[ColumnNameValue] = None) {
     import scala.collection.mutable.ListBuffer
-    var rows: ListBuffer[ColumnNameValue] = new ListBuffer[ColumnNameValue]
-    def add(cv: ColumnNameValue) = rows.append(cv)
+    private val rows: ListBuffer[ColumnNameValue] = new ListBuffer[ColumnNameValue]
+
+    cv.foreach(rows += _)
+
+    def add(cv: ColumnNameValue) = rows += cv
 
     //need to be able to handle adding the two list buffers together 
     //without explicitly exposing the rows unecessarly
     def ++(buffRows: Rows) = {
-        rows = rows ++ buffRows.rows
+        rows ++= buffRows.rows
+    }
+
+    def get = {
+        rows.result
     }
 }
 
 object Rows {
     def apply(cv: ColumnNameValue): Rows = {
-        var r = new Rows()
-        r.rows.append(cv)
-        r
+        new Rows(Some(cv))
     }
 }
 
-case class ColumnFamily(val ks: Keyspace, val name: String) extends Cassandra with LogHelper {
+case class ColumnFamily(val ks: Keyspace, val name: String) extends LogHelper {
     import me.prettyprint.hector.api.factory.HFactory
     import me.prettyprint.hector.api.ddl.ComparatorType
-    import me.prettyprint.cassandra.service.ThriftKsDef
-    import me.prettyprint.hector.api.exceptions.HInvalidRequestException
-    import me.prettyprint.hector.api.ddl.KeyspaceDefinition;
-    import me.prettyprint.hector.api.ddl.ColumnFamilyDefinition;
-    import java.util.Arrays
     import Conversions._
 
-    var cfDef: ColumnFamilyDefinition = null
-    var newKeyspace: KeyspaceDefinition = null
+    private lazy val columnFamilyDefinition = HFactory.createColumnFamilyDefinition(ks, name, ComparatorType.UTF8TYPE)
 
     def ->(row: String) = new Row(this, row)
 
@@ -103,14 +107,26 @@ case class ColumnFamily(val ks: Keyspace, val name: String) extends Cassandra wi
     def >%(sets: (CounterQuery[String, String]) => Unit, proc: (Long) => Unit) = {
         Cassandra >% (this, sets, proc)
     }
+
+    def create = {
+        Cassandra.cluster.addColumnFamily(columnFamilyDefinition, true)
+    }
+
+    def delete = {
+        Cassandra.cluster.dropColumnFamily(ks, name, true)
+    }
 }
 
 case class Keyspace(val name: String, val replicationFactor: Int = 1) {
+    private lazy val keyspaceDefinition = HFactory.createKeyspaceDefinition(name, classOf[SimpleStrategy].getName(), replicationFactor, Collections.emptyList())
+
     def create = {
-        val cfDef:List[ColumnFamilyDefinition] = List.empty
-        val ksDef = HFactory.createKeyspaceDefinition(name, classOf[SimpleStrategy].getName(), replicationFactor, cfDef)
-        Cassandra.cluster.addKeyspace(ksDef, true)
+        Cassandra.cluster.addKeyspace(keyspaceDefinition, true)
     }
-    
+
+    def delete = {
+        Cassandra.cluster.dropKeyspace(name, true)
+    }
+
     def \(cf: String) = new ColumnFamily(this, cf)
 }
