@@ -13,6 +13,6 @@ libraryDependencies ++= Seq(
 	"me.prettyprint" % "hector-core" % "0.8.0-2"
 )
 
-publishTo := Some("Nexus" at "http://nexus:8082/nexus/content/repositories/releases/")
+publishTo := Some("Nexus" at "http://nexus:8082/nexus/content/repositories/snapshots/")
 
 credentials += Credentials(Path.userHome / ".ivy2" / ".credentials") 

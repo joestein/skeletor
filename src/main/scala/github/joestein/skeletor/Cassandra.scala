@@ -8,6 +8,7 @@ import Conversions._
 import me.prettyprint.hector.api.query.Query
 import me.prettyprint.hector.api.beans.{ Rows => HectorRows }
 import me.prettyprint.cassandra.model.IndexedSlicesQuery
+import me.prettyprint.hector.api.Serializer
 
 object Cassandra extends LogHelper {
     //https://github.com/rantav/hector/blob/master/core/src/main/java/me/prettyprint/hector/api/factory/HFactory.java
@@ -49,7 +50,7 @@ object Cassandra extends LogHelper {
         var mutator = HFactory.createMutator(ksp, stringSerializer);
 
         rows.foreach { cv =>
-            mutator.insertCounter(cv.row, cv.cf, HFactory.createCounterColumn(cv.name, cv.value.toInt))
+            mutator.insertCounter(cv.row, cv.cf, HFactory.createCounterColumn(cv.name, cv.intValue))
         }
 
         mutator.execute()
@@ -67,19 +68,19 @@ object Cassandra extends LogHelper {
             var mutator = HFactory.createMutator(ksp, stringSerializer);
 
             rows.foreach { cv =>
-                mutator.addInsertion(cv.row, cv.cf, HFactory.createStringColumn(cv.name, cv.value))
+                mutator.addInsertion(cv.row, cv.cf, cv.hColumn)
             }
 
             mutator.execute()
         }
     }
 
-    def indexQuery(cf: ColumnFamily, settings: (IndexedSlicesQuery[String, String, String]) => Unit, proc: (String, String, String) => Unit, cl: ConsistencyLevelPolicy = defaultWriteConsistencyLevel) = {
+    def indexQuery[V](cf: ColumnFamily, settings: (IndexedSlicesQuery[String, String, V]) => Unit, proc: (String, String, V) => Unit, valueSerializer: Serializer[V], cl: ConsistencyLevelPolicy = defaultWriteConsistencyLevel) = {
         var stringSerializer = StringSerializer.get()
         val ksp = HFactory.createKeyspace(cf.ks, cluster);
         ksp.setConsistencyLevelPolicy(cl) //this way you can set your own consistency level
 
-        var query = HFactory.createIndexedSlicesQuery(ksp, stringSerializer, stringSerializer, stringSerializer)
+        var query = HFactory.createIndexedSlicesQuery(ksp, stringSerializer, stringSerializer, valueSerializer)
         query.setColumnFamily(cf);
 
         settings(query); //let the caller define keys, range, count whatever they want on this CF
@@ -104,7 +105,7 @@ object Cassandra extends LogHelper {
         rangeQuery(cf, settings, proc, cl)
     }
 
-    private def executeQuery(query: Query[_ <: HectorRows[String, String, String]], proc: (String, String, String) => Unit) = {
+    private def executeQuery[V](query: Query[_ <: HectorRows[String, String, V]], proc: (String, String, V) => Unit) = {
         var result = query.execute();
         var orderedRows = result.get();
         import scala.collection.JavaConversions._
@@ -113,13 +114,9 @@ object Cassandra extends LogHelper {
             val c = o.getColumnSlice()
             val d = c.getColumns()
 
-            if (d.isEmpty()) {
-                proc(o.getKey, null, null)
-            } else {
-                for (l <- d) {
-                    debug("query=" + o.getKey() + " for column=" + l.getName() + " & value=" + l.getValue())
-                    proc(o.getKey(), l.getName(), l.getValue())
-                }
+            for (l <- d) {
+                debug("query=" + o.getKey() + " for column=" + l.getName() + " & value=" + l.getValue())
+                proc(o.getKey(), l.getName(), l.getValue())
             }
         }
     }

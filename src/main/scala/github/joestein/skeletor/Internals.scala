@@ -1,17 +1,17 @@
 package github.joestein.skeletor
 
 import java.util.Collections
-
 import scala.collection.mutable.ListBuffer
-
 import org.apache.cassandra.locator.SimpleStrategy
-
 import github.joestein.skeletor.Conversions.keyspaceString
 import github.joestein.util.LogHelper
 import me.prettyprint.hector.api.ddl.ComparatorType
 import me.prettyprint.hector.api.factory.HFactory
 import me.prettyprint.hector.api.query.MultigetSliceQuery
 import me.prettyprint.hector.api.query.{ MultigetSliceCounterQuery, CounterQuery }
+import me.prettyprint.cassandra.serializers.StringSerializer
+import me.prettyprint.cassandra.serializers.LongSerializer
+import java.lang.{ Long => JLong }
 
 object Conversions {
     implicit def simplekey(s: String): Keyspace = Keyspace(s)
@@ -21,32 +21,44 @@ object Conversions {
     implicit def getrows(r: Rows) = r.get
 }
 
-case class ColumnNameValue(column: Column, name: String, value: String, isCounter: Boolean) {
+case class ColumnNameValue(column: Column, name: String, value: Any, isCounter: Boolean) extends LogHelper {
     def ks() = column.row.cf.ks
     def row() = column.row
     def cf() = column.row.cf
+
+    def intValue = value match {
+        case i: Int    => i
+        case l: Long   => l.toInt
+        case n: Number => n.intValue()
+        case _         => value.toString.toInt
+    }
+
+    def hColumn = value match {
+        case l: Long =>
+            HFactory.createColumn(name, JLong.valueOf(l), StringSerializer.get(), LongSerializer.get())
+        case _ =>
+            HFactory.createStringColumn(name, value.toString)
+    }
 }
 
 case class Column(row: Row, name: String) {
 
-    def of(value: String) = {
-        ColumnNameValue(this, name, value.toString(), false)
-    }
+    def of(value: Any) = ColumnNameValue(this, name, value, false)
 
     def inc() = {
-        ColumnNameValue(this, name, "1", true)
+        ColumnNameValue(this, name, 1, true)
     }
 
     def inc(value: Int) = {
-        ColumnNameValue(this, name, value.toString(), true)
+        ColumnNameValue(this, name, value, true)
     }
 
     def dec(value: Int) = {
-        ColumnNameValue(this, name, (value - (2 * value)).toString(), true)
+        ColumnNameValue(this, name, (value - (2 * value)), true)
     }
 
     def dec() = {
-        ColumnNameValue(this, name, "-1", true)
+        ColumnNameValue(this, name, -1, true)
     }
 }
 
@@ -61,14 +73,14 @@ object Row {
 
 class Rows(cv: Option[ColumnNameValue] = None) {
     import scala.collection.mutable.ListBuffer
-    private val rows: ListBuffer[ColumnNameValue] = new ListBuffer[ColumnNameValue]
+    private val rows = new ListBuffer[ColumnNameValue]
 
     cv.foreach(rows += _)
 
     def add(cv: ColumnNameValue) = {
-      rows += cv
-      this
-    } 
+        rows += cv
+        this
+    }
 
     //need to be able to handle adding the two list buffers together 
     //without explicitly exposing the rows unecessarly
@@ -112,10 +124,10 @@ case class ColumnFamily(val ks: Keyspace, val name: String) extends LogHelper {
         Cassandra >% (this, sets, proc)
     }
 
-    def << (rows:Seq[ColumnNameValue]) = {
+    def <<(rows: Seq[ColumnNameValue]) = {
         Cassandra << rows
     }
-    
+
     /*
      *  create the column family
      */
