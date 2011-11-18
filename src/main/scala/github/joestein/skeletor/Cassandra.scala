@@ -43,11 +43,11 @@ object Cassandra extends LogHelper {
     }
 
     def ++(rows: Seq[ColumnNameValue], cl: ConsistencyLevelPolicy = defaultWriteConsistencyLevel): Unit = {
-        var stringSerializer = StringSerializer.get()
+        val stringSerializer = StringSerializer.get()
         val ksp = HFactory.createKeyspace(rows(0).ks, cluster);
         ksp.setConsistencyLevelPolicy(cl) //this way you can set your own consistency level
 
-        var mutator = HFactory.createMutator(ksp, stringSerializer);
+        val mutator = HFactory.createMutator(ksp, stringSerializer);
 
         rows.foreach { cv =>
             mutator.insertCounter(cv.row, cv.cf, HFactory.createCounterColumn(cv.name, cv.intValue))
@@ -61,11 +61,11 @@ object Cassandra extends LogHelper {
         if (rows(0).isCounter) { //it is a counter column to shoot it on up
             ++(rows, cl) //this way you can set your own consistency level
         } else {
-            var stringSerializer = StringSerializer.get()
+            val stringSerializer = StringSerializer.get()
             val ksp = HFactory.createKeyspace(rows(0).ks, cluster);
             ksp.setConsistencyLevelPolicy(cl) //this way you can set your own consistency level
 
-            var mutator = HFactory.createMutator(ksp, stringSerializer);
+            val mutator = HFactory.createMutator(ksp, stringSerializer);
 
             rows.foreach { cv =>
                 mutator.addInsertion(cv.row, cv.cf, cv.hColumn)
@@ -75,12 +75,12 @@ object Cassandra extends LogHelper {
         }
     }
 
-    def indexQuery[V](cf: ColumnFamily, settings: (IndexedSlicesQuery[String, String, V]) => Unit, proc: (String, String, V) => Unit, valueSerializer: Serializer[V], cl: ConsistencyLevelPolicy = defaultWriteConsistencyLevel) = {
-        var stringSerializer = StringSerializer.get()
+    def indexQuery[V](cf: ColumnFamily, settings: (IndexedSlicesQuery[String, String, V]) => Unit, proc: (String, String, V) => Unit, valueSerializer: Serializer[V], cl: ConsistencyLevelPolicy = defaultReadConsistencyLevel) = {
+        val stringSerializer = StringSerializer.get()
         val ksp = HFactory.createKeyspace(cf.ks, cluster);
         ksp.setConsistencyLevelPolicy(cl) //this way you can set your own consistency level
 
-        var query = HFactory.createIndexedSlicesQuery(ksp, stringSerializer, stringSerializer, valueSerializer)
+        val query = HFactory.createIndexedSlicesQuery(ksp, stringSerializer, stringSerializer, valueSerializer)
         query.setColumnFamily(cf);
 
         settings(query); //let the caller define keys, range, count whatever they want on this CF
@@ -88,12 +88,12 @@ object Cassandra extends LogHelper {
         executeQuery(query, proc)
     }
 
-    def rangeQuery(cf: ColumnFamily, settings: (MultigetSliceQuery[String, String, String]) => Unit, proc: (String, String, String) => Unit, cl: ConsistencyLevelPolicy = defaultWriteConsistencyLevel) = {
-        var stringSerializer = StringSerializer.get()
+    def rangeQuery(cf: ColumnFamily, settings: (MultigetSliceQuery[String, String, String]) => Unit, proc: (String, String, String) => Unit, cl: ConsistencyLevelPolicy = defaultReadConsistencyLevel) = {
+        val stringSerializer = StringSerializer.get()
         val ksp = HFactory.createKeyspace(cf.ks, cluster);
         ksp.setConsistencyLevelPolicy(cl) //this way you can set your own consistency level
 
-        var multigetSliceQuery = HFactory.createMultigetSliceQuery(ksp, stringSerializer, stringSerializer, stringSerializer)
+        val multigetSliceQuery = HFactory.createMultigetSliceQuery(ksp, stringSerializer, stringSerializer, stringSerializer)
         multigetSliceQuery.setColumnFamily(cf);
 
         settings(multigetSliceQuery); //let the caller define keys, range, count whatever they want on this CF
@@ -101,13 +101,13 @@ object Cassandra extends LogHelper {
         executeQuery(multigetSliceQuery, proc)
     }
 
-    def >>(cf: ColumnFamily, settings: (MultigetSliceQuery[String, String, String]) => Unit, proc: (String, String, String) => Unit, cl: ConsistencyLevelPolicy = defaultWriteConsistencyLevel) = {
+    def >>(cf: ColumnFamily, settings: (MultigetSliceQuery[String, String, String]) => Unit, proc: (String, String, String) => Unit, cl: ConsistencyLevelPolicy = defaultReadConsistencyLevel) = {
         rangeQuery(cf, settings, proc, cl)
     }
 
     private def executeQuery[V](query: Query[_ <: HectorRows[String, String, V]], proc: (String, String, V) => Unit) = {
-        var result = query.execute();
-        var orderedRows = result.get();
+        val result = query.execute();
+        val orderedRows = result.get();
         import scala.collection.JavaConversions._
         for (o <- orderedRows) {
 
@@ -123,11 +123,11 @@ object Cassandra extends LogHelper {
 
     //delete a row
     def delete(cnv: ColumnNameValue, cl: ConsistencyLevelPolicy = defaultWriteConsistencyLevel) = {
-        var stringSerializer = StringSerializer.get()
+        val stringSerializer = StringSerializer.get()
         val ksp = HFactory.createKeyspace(cnv.ks, cluster);
         ksp.setConsistencyLevelPolicy(cl) //this way you can set your own consistency level
 
-        var mutator = HFactory.createMutator(ksp, stringSerializer);
+        val mutator = HFactory.createMutator(ksp, stringSerializer);
 
         if (cnv.name == "")
             mutator.delete(cnv.row, cnv.cf, null, stringSerializer); //setting null for column gets rid of entire row
@@ -135,18 +135,18 @@ object Cassandra extends LogHelper {
             mutator.delete(cnv.row, cnv.cf, cnv.name, stringSerializer); //setting null for column gets rid of entire row
     }
 
-    def >#(cf: ColumnFamily, sets: (MultigetSliceCounterQuery[String, String]) => Unit, proc: (String, String, Long) => Unit, cl: ConsistencyLevelPolicy = defaultWriteConsistencyLevel) = {
-        var stringSerializer = StringSerializer.get()
+    def >#(cf: ColumnFamily, sets: (MultigetSliceCounterQuery[String, String]) => Unit, proc: (String, String, Long) => Unit, cl: ConsistencyLevelPolicy = defaultReadConsistencyLevel) = {
+        val stringSerializer = StringSerializer.get()
         val ksp = HFactory.createKeyspace(cf.ks, cluster);
         ksp.setConsistencyLevelPolicy(cl) //this way you can set your own consistency level
 
-        var multigetCounterSliceQuery = HFactory.createMultigetSliceCounterQuery(ksp, stringSerializer, stringSerializer)
+        val multigetCounterSliceQuery = HFactory.createMultigetSliceCounterQuery(ksp, stringSerializer, stringSerializer)
         multigetCounterSliceQuery.setColumnFamily(cf);
 
         sets(multigetCounterSliceQuery); //let the caller define keys, range, count whatever they want on this CF
 
-        var result = multigetCounterSliceQuery.execute();
-        var orderedRows = result.get();
+        val result = multigetCounterSliceQuery.execute();
+        val orderedRows = result.get();
         debug("keyMultigetSliceCounterQuery order rows called")
         import scala.collection.JavaConversions._
 
@@ -162,18 +162,18 @@ object Cassandra extends LogHelper {
         }
     }
 
-    def >%(cf: ColumnFamily, sets: (CounterQuery[String, String]) => Unit, proc: (Long) => Unit, cl: ConsistencyLevelPolicy = defaultWriteConsistencyLevel) = {
-        var stringSerializer = StringSerializer.get()
+    def >%(cf: ColumnFamily, sets: (CounterQuery[String, String]) => Unit, proc: (Long) => Unit, cl: ConsistencyLevelPolicy = defaultReadConsistencyLevel) = {
+        val stringSerializer = StringSerializer.get()
         val ksp = HFactory.createKeyspace(cf.ks, cluster);
         ksp.setConsistencyLevelPolicy(cl) //this way you can set your own consistency level
 
-        var getCounterQuery = HFactory.createCounterColumnQuery(ksp, stringSerializer, stringSerializer)
+        val getCounterQuery = HFactory.createCounterColumnQuery(ksp, stringSerializer, stringSerializer)
         getCounterQuery.setColumnFamily(cf)
 
         sets(getCounterQuery); //let the caller define keys, range, count whatever they want on this CF
 
-        var result = getCounterQuery.execute();
-        var counter = result.get();
+        val result = getCounterQuery.execute();
+        val counter = result.get();
 
         if (counter != null)
             proc(counter.getValue())
