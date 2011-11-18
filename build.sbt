@@ -1,7 +1,10 @@
+crossScalaVersions := Seq("2.9.0-1", "2.9.1")
 
-name := "Skeletor"
+organization := "github.joestein"
 
-version := "1.0.0.0"
+name := "skeletor"
+
+version := "1.0.0-SNAPSHOT"
 
 scalaVersion := "2.9.1"
 
@@ -10,3 +13,6 @@ libraryDependencies ++= Seq(
 	"me.prettyprint" % "hector-core" % "0.8.0-2"
 )
 
+publishTo := Some("Nexus" at "http://nexus:8082/nexus/content/repositories/snapshots/")
+
+credentials += Credentials(Path.userHome / ".ivy2" / ".credentials") 
