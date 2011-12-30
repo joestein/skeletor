@@ -1,7 +1,7 @@
 
 name := "Skeletor"
 
-version := "1.0.0.0"
+version := "1.0.1.0"
 
 scalaVersion := "2.9.1"
 

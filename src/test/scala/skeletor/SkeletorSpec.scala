@@ -3,6 +3,8 @@ import github.joestein.skeletor.{Cassandra, Rows}
 import java.util.UUID
 import me.prettyprint.hector.api.query.{MultigetSliceQuery,MultigetSliceCounterQuery,CounterQuery}
 import github.joestein.skeletor.Conversions._
+import me.prettyprint.hector.api.{ConsistencyLevelPolicy}
+import github.joestein.skeletor.{CL}
 
 class SkeletorSpec extends Specification with Cassandra{
 	
@@ -22,6 +24,10 @@ class SkeletorSpec extends Specification with Cassandra{
 		("row_" + UUID.randomUUID().toString(), "column_" + UUID.randomUUID().toString(), "value_" + UUID.randomUUID().toString())
 	}
 	
+	var defaultReadConsistencyLevel: ConsistencyLevelPolicy = {
+		CL.ONE()
+	}	
+	
 	"Skeletor " should  {
 		
 		"be able to add two rows together into the first" in {
@@ -29,19 +35,19 @@ class SkeletorSpec extends Specification with Cassandra{
 			
 			var rows1:Rows = Rows(cv1) //add the row to the rows object
 			
-			(rows1.rows.size == 1) must beTrue
+			(rows1.size == 1) must beTrue
 			
 			val cv2 = (TestColumnFamily -> "rowKey2" has "columnName2" of "columnValue2")
 			
 			var rows2:Rows = Rows(cv2) //add the row to the rows object			
 			
-			rows2.rows.size mustEqual 1
+			rows2.size mustEqual 1
 			
 			rows1 ++ rows2  //add the second Rows into the first Rows, Rows1 becomes the new rows
 			
-			rows2.rows.size mustEqual 1 //make sure rows 2 is still 1
+			rows2.size mustEqual 1 //make sure rows 2 is still 1
 			
-			rows1.rows.size mustEqual 2 //and rows1 is now equal to 2
+			rows1.size mustEqual 2 //and rows1 is now equal to 2
 		}
 		
 		"write to Cassandra and read row key" in {
@@ -55,6 +61,7 @@ class SkeletorSpec extends Specification with Cassandra{
 
 			var rows:Rows = Rows(cv) //add the row to the rows object
 
+			Cassandra.defaultReadConsistencyLevel = defaultReadConsistencyLevel
 			//println("push the row=" + rowKey + " into Cassandra, batch mutate counter column=" + columnName + " and value=" + columnValue)
 			Cassandra << rows 
 			
@@ -83,6 +90,7 @@ class SkeletorSpec extends Specification with Cassandra{
 			var cv = (col inc)
 			var rows:Rows = Rows(cv) //add the row to the rows object
 			
+			Cassandra.defaultReadConsistencyLevel = defaultReadConsistencyLevel
 			//println("push the row counter=" + rowKey + " into Cassandra, batch mutate counter column=" + columnName)
 			Cassandra << rows //push the row into Cassandra, batch mutate
 						
@@ -112,6 +120,7 @@ class SkeletorSpec extends Specification with Cassandra{
 			var cv = (col inc)
 			var rows:Rows = Rows(cv) //add the row to the rows object
 			
+			Cassandra.defaultReadConsistencyLevel = defaultReadConsistencyLevel
 			//println("push the row counter=" + rowKey + " into Cassandra, batch mutate counter column=" + columnName)
 			Cassandra << rows //push the row into Cassandra, batch mutate
 						
@@ -138,6 +147,7 @@ class SkeletorSpec extends Specification with Cassandra{
 			var cv = (col inc 6)
 			var rows:Rows = Rows(cv) //add the row to the rows object
 			
+			Cassandra.defaultReadConsistencyLevel = defaultReadConsistencyLevel
 			//println("push the row counter=" + rowKey + " into Cassandra, batch mutate counter column=" + columnName)
 			Cassandra << rows //push the row into Cassandra, batch mutate
 						
@@ -164,6 +174,7 @@ class SkeletorSpec extends Specification with Cassandra{
 			var cv = (col dec)
 			var rows:Rows = Rows(cv) //add the row to the rows object
 			
+			Cassandra.defaultReadConsistencyLevel = defaultReadConsistencyLevel
 			//println("push the row counter=" + rowKey + " into Cassandra, batch mutate counter column=" + columnName)
 			Cassandra << rows //push the row into Cassandra, batch mutate
 						
@@ -190,6 +201,7 @@ class SkeletorSpec extends Specification with Cassandra{
 			var cv = (col dec 7)
 			var rows:Rows = Rows(cv) //add the row to the rows object
 			
+			Cassandra.defaultReadConsistencyLevel = defaultReadConsistencyLevel
 			//println("push the row counter=" + rowKey + " into Cassandra, batch mutate counter column=" + columnName)
 			Cassandra << rows //push the row into Cassandra, batch mutate
 						
@@ -208,9 +220,6 @@ class SkeletorSpec extends Specification with Cassandra{
 		
 		// more info on consitency settings = http://www.datastax.com/docs/0.8/dml/data_consistency
 		"be able to tune consistency" in {
-			
-			import me.prettyprint.hector.api.{ConsistencyLevelPolicy}
-			import github.joestein.skeletor.{CL}
 			
 			"new default for all reads and another for writes" in {
 				
@@ -235,6 +244,11 @@ class SkeletorSpec extends Specification with Cassandra{
 				var cv = (TestColumnFamily -> "rowKey" has "columnName" of "columnValue")
 				var rows:Rows = Rows(cv) //add the row to the rows object
 
+				var testdefaultReadConsistencyLevel: ConsistencyLevelPolicy = {
+					CL.ANY()
+				}
+				
+				Cassandra.defaultReadConsistencyLevel = testdefaultReadConsistencyLevel
 				//println("push the row=" + rowKey + " into Cassandra, batch mutate counter column=" + columnName + " and value=" + columnValue)
 				Cassandra << (rows, CL.ALL())
 				
@@ -251,6 +265,7 @@ class SkeletorSpec extends Specification with Cassandra{
 
 				var rows:Rows = Rows(cv) //add the row to the rows object
 
+				Cassandra.defaultReadConsistencyLevel = defaultReadConsistencyLevel
 				//println("push the row=" + rowKey + " into Cassandra, batch mutate counter column=" + columnName + " and value=" + columnValue)
 				Cassandra << rows 
 
