@@ -7,8 +7,7 @@ Getting Started
 
 0) Assumptions
 
-* You have SBT installed - https://github.com/harrah/xsbt/wiki/Getting-Started-Setup
-* Cassandra 0.8.6 is running locally - http://wiki.apache.org/cassandra/GettingStarted
+* Cassandra 1.0.8 is running locally - http://wiki.apache.org/cassandra/GettingStarted
 
 1) Get Skeletor
 
@@ -19,11 +18,11 @@ Getting Started
 
 schema/bootstrap.txt contains the schema for Skeletor's Specification Tests
 
-	~/apache-cassandra-0.8.6/bin/cassandra-cli -host localhost -port 9160 -f schema/bootstrap.txt
+	~/apache-cassandra-1.0.8/bin/cassandra-cli -host localhost -port 9160 -f schema/bootstrap.txt
 
 3) Run Skeletor's test
 	
-	sbt test
+	./sbt test
 
 How To Use
 ----------
@@ -36,9 +35,12 @@ You can package Skeletor as a jar within your project
 
 And in your 
 `build.sbt` file add to 
-`libraryDependencies ++= Seq` so you get the Hector library
+`libraryDependencies ++= Seq` so you get the Hector library and related dependencies
 
-	"me.prettyprint" % "hector-core" % "0.8.0-2"
+	"me.prettyprint" % "hector-core" % "1.0-3",
+	"org.apache.cassandra" % "cassandra-all" % "1.0.8",	
+	"org.slf4j" % "slf4j-log4j12" % "1.6.4"
+	
 
 Thanx =) Joe Stein
 
