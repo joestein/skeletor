@@ -31,7 +31,7 @@ The tests are also examples of how to use Skeletor.  Take a look at them.
 
 You can package Skeletor as a jar within your project
 
-	sbt package
+	./sbt package
 
 And in your 
 `build.sbt` file add to 
