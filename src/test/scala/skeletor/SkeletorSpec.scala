@@ -82,9 +82,13 @@ class SkeletorSpec extends Specification with Cassandra{
 		}
 
 		"write mutliple rows and retrieve them" in {
+			var shouldBeResultList = List[String]()
 			val r = scala.util.Random
+			val columnName = "columnName" + r.nextInt.toString
 			val list = List.fill(10) {
-				Rows((MultiRowTestColumnFamily -> ("rowKey" + r.nextInt.toString) has "columnName1" of "columnValue1"))
+				val columnValue = "columnValue" + r.nextInt.toString
+				shouldBeResultList = shouldBeResultList ++ List(columnValue)
+				Rows((MultiRowTestColumnFamily -> ("rowKey" + r.nextInt.toString) has columnName of columnValue))
 			}
 
 			val rows = list.reduce { (rows, newRow) => rows ++ newRow; rows }
@@ -102,13 +106,13 @@ class SkeletorSpec extends Specification with Cassandra{
 				rsq.setKeys("", "")
 				// rsq.setRowCount(rows)
 				rsq.setRange("", "", false, 3)
-				// if (columnName != null) rsq.setColumnNames(columnName)
+				rsq.setColumnNames(columnName)
 			}
 
 			MultiRowTestColumnFamily >>> (sets, processRow)
 
 			resultList.length mustEqual(10)
-
+			resultList must haveTheSameElementsAs(shouldBeResultList)
 		}
 
 		"increment a counter and read the values back with a multi get slice" in {
