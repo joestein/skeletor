@@ -8,7 +8,7 @@ import github.joestein.util.LogHelper
 import me.prettyprint.hector.api.ddl.ComparatorType
 import me.prettyprint.hector.api.factory.HFactory
 import me.prettyprint.hector.api.query.MultigetSliceQuery
-import me.prettyprint.hector.api.query.{ MultigetSliceCounterQuery, CounterQuery }
+import me.prettyprint.hector.api.query.{ MultigetSliceCounterQuery, CounterQuery, RangeSlicesQuery }
 import me.prettyprint.cassandra.serializers.StringSerializer
 import me.prettyprint.cassandra.serializers.LongSerializer
 import java.lang.{ Long => JLong }
@@ -74,7 +74,7 @@ object Row {
 class Rows(cv: Option[ColumnNameValue] = None) {
     import scala.collection.mutable.ListBuffer
     val rows = new ListBuffer[ColumnNameValue]
-	
+
 	cv.foreach(rows += _)
 
     def add(cv: ColumnNameValue) = {
@@ -82,7 +82,7 @@ class Rows(cv: Option[ColumnNameValue] = None) {
         this
     }
 
-    //need to be able to handle adding the two list buffers together 
+    //need to be able to handle adding the two list buffers together
     //without explicitly exposing the rows unecessarly
     def ++(buffRows: Rows) = {
         rows ++= buffRows.rows
@@ -112,6 +112,11 @@ case class ColumnFamily(val ks: Keyspace, val name: String) extends LogHelper {
     //get data out of this column family
     def >>(sets: (MultigetSliceQuery[String, String, String]) => Unit, proc: (String, String, String) => Unit) {
         Cassandra >> (this, sets, proc)
+    }
+
+    //get rows out of this column family
+    def >>>(sets: (RangeSlicesQuery[String, String, String]) => Unit, proc: (String, String, String) => Unit) {
+        Cassandra >>> (this, sets, proc)
     }
 
     //get data of this counter column family

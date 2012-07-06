@@ -8,6 +8,10 @@ CREATE COLUMN FAMILY TestColumnFamily
 WITH comparator = UTF8Type
 AND key_validation_class=UTF8Type;
 
+CREATE COLUMN FAMILY MultiRowTestColumnFamily
+WITH comparator = UTF8Type
+AND key_validation_class=UTF8Type;
+
 CREATE COLUMN FAMILY CounterTestColumnFamily
 WITH default_validation_class=CounterColumnType
 AND key_validation_class=UTF8Type AND comparator=UTF8Type;

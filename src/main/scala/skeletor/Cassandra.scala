@@ -2,7 +2,7 @@ package github.joestein.skeletor
 
 import me.prettyprint.hector.api.{ Cluster, Keyspace => HKeyspace }
 import me.prettyprint.hector.api.factory.HFactory
-import me.prettyprint.hector.api.query.{ MultigetSliceQuery, MultigetSliceCounterQuery, CounterQuery }
+import me.prettyprint.hector.api.query.{ MultigetSliceQuery, MultigetSliceCounterQuery, CounterQuery, RangeSlicesQuery }
 import github.joestein.util.{ LogHelper }
 import Conversions._
 import me.prettyprint.hector.api.query.Query
@@ -103,6 +103,23 @@ object Cassandra extends LogHelper {
 
     def >>(cf: ColumnFamily, settings: (MultigetSliceQuery[String, String, String]) => Unit, proc: (String, String, String) => Unit, cl: ConsistencyLevelPolicy = defaultReadConsistencyLevel) = {
         rangeQuery(cf, settings, proc, cl)
+    }
+
+    def slicesQuery(cf: ColumnFamily, settings: (RangeSlicesQuery[String, String, String]) => Unit, proc: (String, String, String) => Unit, cl: ConsistencyLevelPolicy = defaultReadConsistencyLevel) = {
+        val stringSerializer = StringSerializer.get()
+        val ksp = HFactory.createKeyspace(cf.ks, cluster)
+        ksp.setConsistencyLevelPolicy(cl)
+
+        val rangeSlicesQuery = HFactory.createRangeSlicesQuery(ksp, stringSerializer, stringSerializer, stringSerializer)
+        rangeSlicesQuery.setColumnFamily(cf)
+
+        settings(rangeSlicesQuery)
+
+        executeQuery(rangeSlicesQuery, proc)
+    }
+
+    def >>>(cf: ColumnFamily, settings: (RangeSlicesQuery[String, String, String]) => Unit, proc: (String, String, String) => Unit, cl: ConsistencyLevelPolicy = defaultReadConsistencyLevel) = {
+        slicesQuery(cf, settings, proc, cl)
     }
 
     private def executeQuery[V](query: Query[_ <: HectorRows[String, String, V]], proc: (String, String, V) => Unit) = {
