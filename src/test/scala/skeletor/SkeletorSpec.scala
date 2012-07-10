@@ -1,5 +1,5 @@
 import org.specs._
-import github.joestein.skeletor.{Cassandra, Rows}
+import github.joestein.skeletor.{Cassandra, Rows, Keyspace, ColumnFamily}
 import java.util.UUID
 import me.prettyprint.hector.api.query.{MultigetSliceQuery,MultigetSliceCounterQuery,CounterQuery,RangeSlicesQuery}
 import github.joestein.skeletor.Conversions._
@@ -30,6 +30,18 @@ class SkeletorSpec extends Specification with Cassandra{
 	}
 
 	"Skeletor " should  {
+
+		"be able to create a super column family" in {
+			val ksp = Keyspace("FixtureTestSkeletor")
+			val columnFamily = ColumnFamily(ksp, "SuperColumnFamily")
+			columnFamily.setSuper()
+
+			// these both work as expected
+			// 	columnFamily.delete
+			// 	columnFamily.create
+
+			columnFamily.isSuper mustEqual true
+		}
 
 		"be able to add two rows together into the first" in {
 			val cv1 = (TestColumnFamily -> "rowKey1" has "columnName1" of "columnValue1")

@@ -5,7 +5,7 @@ import scala.collection.mutable.ListBuffer
 import org.apache.cassandra.locator.SimpleStrategy
 import github.joestein.skeletor.Conversions.keyspaceString
 import github.joestein.util.LogHelper
-import me.prettyprint.hector.api.ddl.ComparatorType
+import me.prettyprint.hector.api.ddl.{ComparatorType, ColumnType}
 import me.prettyprint.hector.api.factory.HFactory
 import me.prettyprint.hector.api.query.MultigetSliceQuery
 import me.prettyprint.hector.api.query.{ MultigetSliceCounterQuery, CounterQuery, RangeSlicesQuery }
@@ -106,6 +106,7 @@ case class ColumnFamily(val ks: Keyspace, val name: String) extends LogHelper {
     import Conversions._
 
     private lazy val columnFamilyDefinition = HFactory.createColumnFamilyDefinition(ks, name, ComparatorType.UTF8TYPE)
+    var isSuper = false
 
     def ->(row: String) = new Row(this, row)
 
@@ -131,6 +132,12 @@ case class ColumnFamily(val ks: Keyspace, val name: String) extends LogHelper {
 
     def <<(rows: Seq[ColumnNameValue]) = {
         Cassandra << rows
+    }
+
+    def setSuper(superColumn:Boolean = true) = {
+        isSuper = superColumn
+        if (superColumn) columnFamilyDefinition.setColumnType(ColumnType.SUPER)
+        else columnFamilyDefinition.setColumnType(ColumnType.STANDARD)
     }
 
     /*
