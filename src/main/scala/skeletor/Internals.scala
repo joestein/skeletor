@@ -8,10 +8,10 @@ import github.joestein.util.LogHelper
 import me.prettyprint.hector.api.ddl.{ComparatorType, ColumnType}
 import me.prettyprint.hector.api.factory.HFactory
 import me.prettyprint.hector.api.query.MultigetSliceQuery
-import me.prettyprint.hector.api.query.{ MultigetSliceCounterQuery, CounterQuery, RangeSlicesQuery }
-import me.prettyprint.cassandra.serializers.StringSerializer
-import me.prettyprint.cassandra.serializers.LongSerializer
+import me.prettyprint.hector.api.query.{ MultigetSubSliceQuery, MultigetSliceCounterQuery, CounterQuery, RangeSlicesQuery }
+import me.prettyprint.cassandra.serializers.{ StringSerializer, LongSerializer, BytesArraySerializer }
 import java.lang.{ Long => JLong }
+import scala.collection.JavaConversions._
 
 object Conversions {
     implicit def simplekey(s: String): Keyspace = Keyspace(s)
@@ -21,10 +21,16 @@ object Conversions {
     implicit def getrows(r: Rows) = r.get
 }
 
+
 case class ColumnNameValue(column: Column, name: String, value: Any, isCounter: Boolean) extends LogHelper {
     def ks() = column.row.cf.ks
     def row() = column.row
     def cf() = column.row.cf
+
+    val isSuperColumn = value match {
+        case _:List[_] => true
+        case _ => false
+    }
 
     def intValue = value match {
         case i: Int    => i
@@ -38,6 +44,19 @@ case class ColumnNameValue(column: Column, name: String, value: Any, isCounter: 
             HFactory.createColumn(name, JLong.valueOf(l), StringSerializer.get(), LongSerializer.get())
         case _ =>
             HFactory.createStringColumn(name, value.toString)
+    }
+
+    def hSuperColumn = value match {
+        case list:List[String] =>
+            var columnList = List(HFactory.createColumn(list.head, "", StringSerializer.get(), StringSerializer.get()))
+
+            list.tail.foreach{ columnName:String => {
+                val column = HFactory.createColumn(columnName, "", StringSerializer.get(), StringSerializer.get())
+                columnList = columnList ++ List(column)
+            }}
+
+            HFactory.createSuperColumn(name, asJavaList(columnList), StringSerializer.get(), StringSerializer.get(), StringSerializer.get())
+
     }
 }
 
@@ -113,6 +132,11 @@ case class ColumnFamily(val ks: Keyspace, val name: String) extends LogHelper {
     //get data out of this column family
     def >>(sets: (MultigetSliceQuery[String, String, String]) => Unit, proc: (String, String, String) => Unit) {
         Cassandra >> (this, sets, proc)
+    }
+
+    //get data out of this super column family
+    def superSlicesQuery(sets: (MultigetSubSliceQuery[String, String, String, String]) => Unit, proc: (String, String, String) => Unit) {
+        Cassandra.superSlicesQuery(this, sets, proc)
     }
 
     //get rows out of this column family

@@ -1,7 +1,7 @@
 import org.specs._
 import github.joestein.skeletor.{Cassandra, Rows, Keyspace, ColumnFamily}
 import java.util.UUID
-import me.prettyprint.hector.api.query.{MultigetSliceQuery,MultigetSliceCounterQuery,CounterQuery,RangeSlicesQuery}
+import me.prettyprint.hector.api.query.{MultigetSubSliceQuery, MultigetSliceQuery,MultigetSliceCounterQuery,CounterQuery,RangeSlicesQuery}
 import github.joestein.skeletor.Conversions._
 import me.prettyprint.hector.api.{ConsistencyLevelPolicy}
 import github.joestein.skeletor.{CL}
@@ -11,6 +11,9 @@ class SkeletorSpec extends Specification with Cassandra{
 	val TestColumnFamily = "FixtureTestSkeletor" \ "TestColumnFamily" //now setup the initial CF
 	val CounterTestColumnFamily = "FixtureTestSkeletor" \ "CounterTestColumnFamily" //now setup the initial Counter CF
 	val MultiRowTestColumnFamily = "FixtureTestSkeletor" \ "MultiRowTestColumnFamily"
+
+	val SuperColumnTestFamily = "FixtureTestSkeletor" \ "SuperColumnTestFamily"
+	SuperColumnTestFamily.setSuper()
 
 	doBeforeSpec {
 		Cassandra connect ("skeletor-spec","localhost:9160")
@@ -43,6 +46,7 @@ class SkeletorSpec extends Specification with Cassandra{
 			columnFamily.isSuper mustEqual true
 		}
 
+
 		"be able to add two rows together into the first" in {
 			val cv1 = (TestColumnFamily -> "rowKey1" has "columnName1" of "columnValue1")
 
@@ -61,6 +65,41 @@ class SkeletorSpec extends Specification with Cassandra{
 			rows2.size mustEqual 1 //make sure rows 2 is still 1
 
 			rows1.size mustEqual 2 //and rows1 is now equal to 2
+		}
+
+		"be able to write to a Cassandra Super Column with a list" in {
+
+			val key = UUID.randomUUID().toString()
+			val columnName = "tags"
+			val tags = List("ok", "then", "super")
+			var cv = (SuperColumnTestFamily -> key has columnName of tags)
+
+			var rows:Rows = Rows(cv)
+
+			Cassandra.defaultWriteConsistencyLevel = defaultReadConsistencyLevel
+			Cassandra << rows
+
+			var results = List[String]()
+			def check {
+				results must haveTheSameElementsAs(tags)
+			}
+
+			var count = 0
+			def processRow(r:String, c:String, v:String) {
+				results = results ++ List(c)
+				v mustEqual ""
+				count += 1
+
+				if (count == tags.length) check
+			}
+
+			def sets(mgssq: MultigetSubSliceQuery[String, String, String, String]) {
+				mgssq.setKeys(key)
+				mgssq.setRange("", "", false, 3)
+				mgssq.setSuperColumn(columnName)
+			}
+
+			SuperColumnTestFamily.superSlicesQuery(sets, processRow)
 		}
 
 		"write to Cassandra and read row key" in {
