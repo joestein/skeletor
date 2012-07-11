@@ -1,7 +1,7 @@
 import org.specs._
 import github.joestein.skeletor.{Cassandra, Rows, Keyspace, ColumnFamily}
 import java.util.UUID
-import me.prettyprint.hector.api.query.{MultigetSubSliceQuery, MultigetSliceQuery,MultigetSliceCounterQuery,CounterQuery,RangeSlicesQuery}
+import me.prettyprint.hector.api.query.{MultigetSubSliceQuery, SuperSliceQuery, MultigetSliceQuery, MultigetSliceCounterQuery,CounterQuery,RangeSlicesQuery}
 import github.joestein.skeletor.Conversions._
 import me.prettyprint.hector.api.{ConsistencyLevelPolicy}
 import github.joestein.skeletor.{CL}
@@ -99,7 +99,43 @@ class SkeletorSpec extends Specification with Cassandra{
 				mgssq.setSuperColumn(columnName)
 			}
 
-			SuperColumnTestFamily.superSlicesQuery(sets, processRow)
+			SuperColumnTestFamily.multigetSubSliceQuery(sets, processRow)
+		}
+
+		"be able to read top level super columns" in {
+			val key = UUID.randomUUID().toString()
+			val columnName1 = "tags"
+			val columnName2 = "places"
+			val tags1 = List("ok", "then", "super")
+			val tags2 = List("here", "there", "everywhere")
+			var cv1 = (SuperColumnTestFamily -> key has columnName1 of tags1)
+			var cv2 = (SuperColumnTestFamily -> key has columnName2 of tags2)
+
+			var rows:Rows = Rows(cv1) ++ Rows(cv2)
+
+			Cassandra.defaultWriteConsistencyLevel = defaultReadConsistencyLevel
+			Cassandra << rows
+
+			var results = Set[String]()
+			def check {
+				results must haveTheSameElementsAs(List(columnName1, columnName2))
+			}
+
+			var count = 0
+			def processRow(r:String, c:String, v:String) {
+				results = results ++ Set(r)
+				v mustEqual ""
+				count += 1
+
+				if (results.size == 2) check
+			}
+
+			def sets(mgssq: SuperSliceQuery[String, String, String, String]) {
+				mgssq.setKey(key)
+				mgssq.setRange("", "", false, 3)
+			}
+
+			SuperColumnTestFamily.superSliceQuery(sets, processRow)
 		}
 
 		"write to Cassandra and read row key" in {

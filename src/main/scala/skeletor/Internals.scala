@@ -7,8 +7,7 @@ import github.joestein.skeletor.Conversions.keyspaceString
 import github.joestein.util.LogHelper
 import me.prettyprint.hector.api.ddl.{ComparatorType, ColumnType}
 import me.prettyprint.hector.api.factory.HFactory
-import me.prettyprint.hector.api.query.MultigetSliceQuery
-import me.prettyprint.hector.api.query.{ MultigetSubSliceQuery, MultigetSliceCounterQuery, CounterQuery, RangeSlicesQuery }
+import me.prettyprint.hector.api.query.{ MultigetSliceQuery, SuperSliceQuery, MultigetSubSliceQuery, MultigetSliceCounterQuery, CounterQuery, RangeSlicesQuery }
 import me.prettyprint.cassandra.serializers.{ StringSerializer, LongSerializer, BytesArraySerializer }
 import java.lang.{ Long => JLong }
 import scala.collection.JavaConversions._
@@ -135,8 +134,13 @@ case class ColumnFamily(val ks: Keyspace, val name: String) extends LogHelper {
     }
 
     //get data out of this super column family
-    def superSlicesQuery(sets: (MultigetSubSliceQuery[String, String, String, String]) => Unit, proc: (String, String, String) => Unit) {
-        Cassandra.superSlicesQuery(this, sets, proc)
+    def multigetSubSliceQuery(sets: (MultigetSubSliceQuery[String, String, String, String]) => Unit, proc: (String, String, String) => Unit) {
+        Cassandra.multigetSubSliceQuery(this, sets, proc)
+    }
+
+    //get top level columns from super column family
+    def superSliceQuery(sets: (SuperSliceQuery[String, String, String, String]) => Unit, proc: (String, String, String) => Unit) {
+        Cassandra.superSliceQuery(this, sets, proc)
     }
 
     //get rows out of this column family

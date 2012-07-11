@@ -2,11 +2,11 @@ package github.joestein.skeletor
 
 import me.prettyprint.hector.api.{ Cluster, Keyspace => HKeyspace }
 import me.prettyprint.hector.api.factory.HFactory
-import me.prettyprint.hector.api.query.{ MultigetSliceQuery, MultigetSliceCounterQuery, CounterQuery, RangeSlicesQuery, MultigetSubSliceQuery}
+import me.prettyprint.hector.api.query.{ SuperSliceQuery, MultigetSliceQuery, MultigetSliceCounterQuery, CounterQuery, RangeSlicesQuery, MultigetSubSliceQuery}
 import github.joestein.util.{ LogHelper }
 import Conversions._
 import me.prettyprint.hector.api.query.Query
-import me.prettyprint.hector.api.beans.{ Rows => HectorRows }
+import me.prettyprint.hector.api.beans.{ Rows => HectorRows, SuperSlice }
 import me.prettyprint.cassandra.model.IndexedSlicesQuery
 import me.prettyprint.hector.api.Serializer
 
@@ -106,7 +106,7 @@ object Cassandra extends LogHelper {
         rangeQuery(cf, settings, proc, cl)
     }
 
-    def slicesQuery(cf: ColumnFamily, settings: (RangeSlicesQuery[String, String, String]) => Unit, proc: (String, String, String) => Unit, cl: ConsistencyLevelPolicy = defaultReadConsistencyLevel) = {
+    def rangeSlicesQuery(cf: ColumnFamily, settings: (RangeSlicesQuery[String, String, String]) => Unit, proc: (String, String, String) => Unit, cl: ConsistencyLevelPolicy = defaultReadConsistencyLevel) = {
         val stringSerializer = StringSerializer.get()
         val ksp = HFactory.createKeyspace(cf.ks, cluster)
         ksp.setConsistencyLevelPolicy(cl)
@@ -119,7 +119,20 @@ object Cassandra extends LogHelper {
         executeQuery(rangeSlicesQuery, proc)
     }
 
-    def superSlicesQuery(cf: ColumnFamily, settings: (MultigetSubSliceQuery[String, String, String, String]) => Unit, proc: (String, String, String) => Unit, cl: ConsistencyLevelPolicy = defaultReadConsistencyLevel) = {
+    def superSliceQuery(cf: ColumnFamily, settings: (SuperSliceQuery[String, String, String, String]) => Unit, proc: (String, String, String) => Unit, cl: ConsistencyLevelPolicy = defaultReadConsistencyLevel) = {
+        val stringSerializer = StringSerializer.get()
+        val ksp = HFactory.createKeyspace(cf.ks, cluster)
+        ksp.setConsistencyLevelPolicy(cl)
+
+        val superSliceQuery = HFactory.createSuperSliceQuery(ksp, stringSerializer, stringSerializer, stringSerializer, stringSerializer)
+        superSliceQuery.setColumnFamily(cf)
+
+        settings(superSliceQuery)
+
+        executeSuperQuery(superSliceQuery, proc)
+    }
+
+    def multigetSubSliceQuery(cf: ColumnFamily, settings: (MultigetSubSliceQuery[String, String, String, String]) => Unit, proc: (String, String, String) => Unit, cl: ConsistencyLevelPolicy = defaultReadConsistencyLevel) = {
         val stringSerializer = StringSerializer.get()
         val ksp = HFactory.createKeyspace(cf.ks, cluster)
         ksp.setConsistencyLevelPolicy(cl)
@@ -133,7 +146,7 @@ object Cassandra extends LogHelper {
     }
 
     def >>>(cf: ColumnFamily, settings: (RangeSlicesQuery[String, String, String]) => Unit, proc: (String, String, String) => Unit, cl: ConsistencyLevelPolicy = defaultReadConsistencyLevel) = {
-        slicesQuery(cf, settings, proc, cl)
+        rangeSlicesQuery(cf, settings, proc, cl)
     }
 
     private def executeQuery[V](query: Query[_ <: HectorRows[String, String, V]], proc: (String, String, V) => Unit) = {
@@ -148,6 +161,20 @@ object Cassandra extends LogHelper {
             for (l <- d) {
                 debug("query=" + o.getKey() + " for column=" + l.getName() + " & value=" + l.getValue())
                 proc(o.getKey(), l.getName(), l.getValue())
+            }
+        }
+    }
+
+    private def executeSuperQuery[V](query: Query[_ <: SuperSlice[String, String, V]], proc: (String, String, V) => Unit) = {
+        val result = query.execute()
+        val superSlice = result.get()
+        val superColumns = superSlice.getSuperColumns()
+
+        import scala.collection.JavaConversions._
+        for (sc <- superColumns) {
+            val cs = sc.getColumns()
+            for (c <- cs) {
+                proc(sc.getName(), c.getName(), c.getValue())
             }
         }
     }
