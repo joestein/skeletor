@@ -1,7 +1,7 @@
 Skeletor
 ========
 
-Provides a Scala wrapper for Hector https://github.com/rantav/hector, a Java client library for Cassandra http://cassandra.apache.org/
+Provides a Scala wrapper for Hector https://github.com/hector-client/hector, a Java client library for Cassandra http://cassandra.apache.org/
 Getting Started
 ---------------
 
