@@ -2,11 +2,11 @@ package github.joestein.skeletor
 
 import me.prettyprint.hector.api.{ Cluster, Keyspace => HKeyspace }
 import me.prettyprint.hector.api.factory.HFactory
-import me.prettyprint.hector.api.query.{ MultigetSliceQuery, MultigetSliceCounterQuery, CounterQuery }
+import me.prettyprint.hector.api.query.{ SuperSliceQuery, MultigetSliceQuery, MultigetSliceCounterQuery, CounterQuery, RangeSlicesQuery, MultigetSubSliceQuery}
 import github.joestein.util.{ LogHelper }
 import Conversions._
 import me.prettyprint.hector.api.query.Query
-import me.prettyprint.hector.api.beans.{ Rows => HectorRows }
+import me.prettyprint.hector.api.beans.{ Rows => HectorRows, SuperSlice }
 import me.prettyprint.cassandra.model.IndexedSlicesQuery
 import me.prettyprint.hector.api.Serializer
 
@@ -68,7 +68,8 @@ object Cassandra extends LogHelper {
             val mutator = HFactory.createMutator(ksp, stringSerializer);
 
             rows.foreach { cv =>
-                mutator.addInsertion(cv.row, cv.cf, cv.hColumn)
+                if (cv.isSuperColumn) mutator.addInsertion(cv.row, cv.cf, cv.hSuperColumn)
+                else mutator.addInsertion(cv.row, cv.cf, cv.hColumn)
             }
 
             mutator.execute()
@@ -94,15 +95,58 @@ object Cassandra extends LogHelper {
         ksp.setConsistencyLevelPolicy(cl) //this way you can set your own consistency level
 
         val multigetSliceQuery = HFactory.createMultigetSliceQuery(ksp, stringSerializer, stringSerializer, stringSerializer)
-        multigetSliceQuery.setColumnFamily(cf);
+        multigetSliceQuery.setColumnFamily(cf)
 
-        settings(multigetSliceQuery); //let the caller define keys, range, count whatever they want on this CF
+        settings(multigetSliceQuery) //let the caller define keys, range, count whatever they want on this CF
 
         executeQuery(multigetSliceQuery, proc)
     }
 
     def >>(cf: ColumnFamily, settings: (MultigetSliceQuery[String, String, String]) => Unit, proc: (String, String, String) => Unit, cl: ConsistencyLevelPolicy = defaultReadConsistencyLevel) = {
         rangeQuery(cf, settings, proc, cl)
+    }
+
+    def rangeSlicesQuery(cf: ColumnFamily, settings: (RangeSlicesQuery[String, String, String]) => Unit, proc: (String, String, String) => Unit, cl: ConsistencyLevelPolicy = defaultReadConsistencyLevel) = {
+        val stringSerializer = StringSerializer.get()
+        val ksp = HFactory.createKeyspace(cf.ks, cluster)
+        ksp.setConsistencyLevelPolicy(cl)
+
+        val rangeSlicesQuery = HFactory.createRangeSlicesQuery(ksp, stringSerializer, stringSerializer, stringSerializer)
+        rangeSlicesQuery.setColumnFamily(cf)
+
+        settings(rangeSlicesQuery)
+
+        executeQuery(rangeSlicesQuery, proc)
+    }
+
+    def superSliceQuery(cf: ColumnFamily, settings: (SuperSliceQuery[String, String, String, String]) => Unit, proc: (String, String, String) => Unit, cl: ConsistencyLevelPolicy = defaultReadConsistencyLevel) = {
+        val stringSerializer = StringSerializer.get()
+        val ksp = HFactory.createKeyspace(cf.ks, cluster)
+        ksp.setConsistencyLevelPolicy(cl)
+
+        val superSliceQuery = HFactory.createSuperSliceQuery(ksp, stringSerializer, stringSerializer, stringSerializer, stringSerializer)
+        superSliceQuery.setColumnFamily(cf)
+
+        settings(superSliceQuery)
+
+        executeSuperQuery(superSliceQuery, proc)
+    }
+
+    def multigetSubSliceQuery(cf: ColumnFamily, settings: (MultigetSubSliceQuery[String, String, String, String]) => Unit, proc: (String, String, String) => Unit, cl: ConsistencyLevelPolicy = defaultReadConsistencyLevel) = {
+        val stringSerializer = StringSerializer.get()
+        val ksp = HFactory.createKeyspace(cf.ks, cluster)
+        ksp.setConsistencyLevelPolicy(cl)
+
+        val multigetSubSliceQuery = HFactory.createMultigetSubSliceQuery(ksp, stringSerializer, stringSerializer, stringSerializer, stringSerializer)
+        multigetSubSliceQuery.setColumnFamily(cf)
+
+        settings(multigetSubSliceQuery)
+
+        executeQuery(multigetSubSliceQuery, proc)
+    }
+
+    def >>>(cf: ColumnFamily, settings: (RangeSlicesQuery[String, String, String]) => Unit, proc: (String, String, String) => Unit, cl: ConsistencyLevelPolicy = defaultReadConsistencyLevel) = {
+        rangeSlicesQuery(cf, settings, proc, cl)
     }
 
     private def executeQuery[V](query: Query[_ <: HectorRows[String, String, V]], proc: (String, String, V) => Unit) = {
@@ -117,6 +161,20 @@ object Cassandra extends LogHelper {
             for (l <- d) {
                 debug("query=" + o.getKey() + " for column=" + l.getName() + " & value=" + l.getValue())
                 proc(o.getKey(), l.getName(), l.getValue())
+            }
+        }
+    }
+
+    private def executeSuperQuery[V](query: Query[_ <: SuperSlice[String, String, V]], proc: (String, String, V) => Unit) = {
+        val result = query.execute()
+        val superSlice = result.get()
+        val superColumns = superSlice.getSuperColumns()
+
+        import scala.collection.JavaConversions._
+        for (sc <- superColumns) {
+            val cs = sc.getColumns()
+            for (c <- cs) {
+                proc(sc.getName(), c.getName(), c.getValue())
             }
         }
     }
