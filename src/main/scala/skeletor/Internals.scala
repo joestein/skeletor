@@ -2,13 +2,13 @@ package github.joestein.skeletor
 
 import java.util.Collections
 import scala.collection.mutable.ListBuffer
-import org.apache.cassandra.locator.SimpleStrategy
 import github.joestein.skeletor.Conversions.keyspaceString
 import github.joestein.util.LogHelper
 import me.prettyprint.hector.api.ddl.{ComparatorType, ColumnType}
 import me.prettyprint.hector.api.factory.HFactory
 import me.prettyprint.hector.api.query.{ MultigetSliceQuery, SuperSliceQuery, MultigetSubSliceQuery, MultigetSliceCounterQuery, CounterQuery, RangeSlicesQuery }
 import me.prettyprint.cassandra.serializers.{ StringSerializer, LongSerializer, BytesArraySerializer }
+import me.prettyprint.cassandra.service.ThriftKsDef
 import java.lang.{ Long => JLong }
 import scala.collection.JavaConversions._
 
@@ -54,7 +54,7 @@ case class ColumnNameValue(column: Column, name: String, value: Any, isCounter: 
                 columnList = columnList ++ List(column)
             }}
 
-            HFactory.createSuperColumn(name, asJavaList(columnList), StringSerializer.get(), StringSerializer.get(), StringSerializer.get())
+            HFactory.createSuperColumn(name, seqAsJavaList(columnList), StringSerializer.get(), StringSerializer.get(), StringSerializer.get())
 
     }
 }
@@ -191,7 +191,7 @@ case class ColumnFamily(val ks: Keyspace, val name: String) extends LogHelper {
 }
 
 case class Keyspace(val name: String, val replicationFactor: Int = 1) {
-    private lazy val keyspaceDefinition = HFactory.createKeyspaceDefinition(name, classOf[SimpleStrategy].getName(), replicationFactor, Collections.emptyList())
+    private lazy val keyspaceDefinition = HFactory.createKeyspaceDefinition(name, ThriftKsDef.DEF_STRATEGY_CLASS, replicationFactor, Collections.emptyList())
 
     def create = {
         Cassandra.cluster.addKeyspace(keyspaceDefinition, true)
